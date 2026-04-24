@@ -101,7 +101,9 @@ header{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) var(--s6)
 .fbr-tools{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .fbr-sort{font-size:10px;padding:2px 6px;border-radius:var(--rsm);background:var(--surfoff);border:1px solid var(--bord);color:var(--muted);cursor:pointer}.fbr-sort.act{background:var(--pri);color:#fff;border-color:var(--pri)}
 .fbr-size{-webkit-appearance:none;appearance:none;width:70px;height:4px;border-radius:2px;background:var(--bord);outline:none;cursor:pointer}.fbr-size::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--pri)}
-.add-op-btn{flex-direction:column !important;gap:1px !important;padding:6px 4px !important;font-size:var(--txs) !important;line-height:1.1}
+.oi.has-error{border-color:var(--warn)!important;background:color-mix(in oklch,var(--warn) 6%,var(--surf2))!important}
+.op-errors{font-size:10px;color:var(--warn);margin-top:4px;padding:3px 6px;background:color-mix(in oklch,var(--warn) 10%,var(--surfoff));border-radius:var(--rsm)}
+.add-op-btn{flex-direction:column !important;gap:0 !important;padding:8px 6px !important;font-size:var(--txs) !important;line-height:1.3;align-items:center !important;justify-content:center !important}
 .add-plus{font-size:16px;font-weight:300;line-height:1;color:var(--pri)}
 .fbr-count{font-size:10px;color:var(--faint);margin-left:auto}
 .fbr-list{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px}.fbr-list::-webkit-scrollbar{width:4px}.fbr-list::-webkit-scrollbar-thumb{background:var(--bord);border-radius:999px}
@@ -137,6 +139,7 @@ main{display:flex;overflow:hidden}
   <span class="badge" id="cnt-lbl" style="display:none">0 operacji</span>
   <div class="hact">
     <input id="fileInput" type="file" accept=".tcn,.TCN,.txt" class="hidden"/>
+    <button class="btn btn-sec" onclick="newFile()">Nowy</button>
     <button class="btn btn-sec" id="saveBtn" onclick="saveTCN()" disabled>Zapisz</button>
     <button class="btn btn-sec" id="saveAsBtn" onclick="saveTCNAs()" disabled>Zapisz jako…</button>
     <button class="btn-ic" onclick="openSettings()" title="Ustawienia narzędzi">
@@ -227,7 +230,7 @@ main{display:flex;overflow:hidden}
           <button class="btn btn-sec add-op-btn" onclick="openAddForm('blade')"><span class="add-plus">+</span>Piłka</button>
           <button class="btn btn-sec add-op-btn" onclick="openAddForm('mill')"><span class="add-plus">+</span>Frezowanie</button>
         </div>
-        <div class="add-form hidden" id="add-form">
+        <div class="add-form hidden" id="add-form" style="display:none!important">
           <h4 id="add-title">Nowa operacja</h4>
           <div class="add-grid" id="add-fields"></div>
           <div class="add-actions">
@@ -257,6 +260,7 @@ main{display:flex;overflow:hidden}
         </table>
       </div>
       <div class="modal-section">
+        <h3>Frezy – numery narzędzi (#205)</h3>
         <p>Wpisz numer freza (#205) i jego średnicę. Ścieżka frezowania będzie rysowana z odpowiednią szerokością na rzutach 2D.</p>
         <table class="tool-table" id="mill-tools-table">
           <thead><tr><th>Nr narzędzia (#205)</th><th>Średnica (mm)</th><th></th></tr></thead>
@@ -286,6 +290,10 @@ main{display:flex;overflow:hidden}
 let EL={DL:0,DH:0,DS:0};
 let OPS=[];
 let LOADED=false;
+// Decimal separator of the loaded file (',' or '.') – preserved on save
+let fileDecSep='.';
+// System locale decimal separator – used for UI display
+const SYS_DEC=(1.1).toLocaleString().replace(/\d/g,'').trim()||'.';
 let selWs=null,curFilter='ALL',curView='3d',showDims=true,xrayMode=false;
 
 /* ── Operation colour palette (dark / light theme) ── */
@@ -313,7 +321,19 @@ let scene,cam,ren,controls,bGroup,markers=[];
 
 const dk=()=>document.documentElement.getAttribute('data-theme')==='dark';
 function showToast(msg,err=false){const t=document.getElementById('toast');t.textContent=msg;t.style.background=err?'var(--warn)':'var(--ok)';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
-function fv(v){const r=Math.round(v*100)/100;const s=r.toFixed(2);return s.endsWith('.00')?s.slice(0,-3):s.replace(/(\.\d)0$/,'$1');}
+function fv(v){
+  // For canvas labels – uses system decimal separator
+  const r=Math.round(v*100)/100;
+  const s=r.toFixed(2);
+  const clean=s.endsWith('.00')?s.slice(0,-3):s.replace(/(\.\d)0$/,'$1');
+  return SYS_DEC===','?clean.replace('.',','):clean;
+}
+function fvI(v){
+  // For <input type="number"> – always dot (browser requirement)
+  const r=Math.round(v*100)/100;
+  const s=r.toFixed(2);
+  return s.endsWith('.00')?s.slice(0,-3):s.replace(/(\.\d)0$/,'$1');
+}
 
 /* ─── STATE ────────────────────────────────────────────────────────── */
 function setLoadedState(ok,name=''){
@@ -340,6 +360,15 @@ function setLoadedState(ok,name=''){
 
 /* ─── PARSER ─────────────────────────────────────────────────────── */
 function parseTCN(txt){
+  // ── Detect and normalise decimal separator ───────────────────────
+  // Check if file uses comma: look for patterns like #1=380,5
+  fileDecSep=/[#=]\d+,\d/.test(txt) ? ',' : '.';
+  // Normalise to dots for internal parsing
+  if(fileDecSep===','){
+    txt=txt.replace(/(#[\w]+=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'));
+    txt=txt.replace(/(DL=|DH=|DS=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'));
+  }
+
   const dim=txt.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)\s+DS=([\d.\-]+)/i);
   if(!dim)throw new Error('Brak ::UNm');
   EL.DL=parseFloat(dim[1]);EL.DH=parseFloat(dim[2]);EL.DS=parseFloat(dim[3]);
@@ -349,7 +378,19 @@ function parseTCN(txt){
 
   const sideMap={1:'TOP',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
   const sideRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
-  const ops=[];let maxWs=0;let sm;
+  const ops=[];let maxWs=0;let autoWs=500;let sm;
+
+  // Helper: parse numeric param, handles both '.' and ',' decimals
+  const g=(raw,k,def=null)=>{
+    const m=raw.match(new RegExp('#'+k+'=([\\d.,\\-]+)'));
+    if(!m)return def;
+    return parseFloat(m[1].replace(',','.'));
+  };
+  const ws=(raw)=>{
+    const m=raw.match(/WS=(\d+)/)||raw.match(/WN=\S+/); // WN= as fallback name
+    const wm=raw.match(/WS=(\d+)/);
+    return wm?parseInt(wm[1]):null;
+  };
 
   while((sm=sideRe.exec(txt))){
     const side=sideMap[parseInt(sm[1])]||`SIDE${sm[1]}`;
@@ -357,25 +398,27 @@ function parseTCN(txt){
     const toks=[];let t;
     while((t=tokRe.exec(sm[2])))toks.push({code:t[1],raw:t[2]});
 
-    const g=(raw,k,def=null)=>{const m=raw.match(new RegExp('#'+k+'=([\\d.\\-]+)'));return m?parseFloat(m[1]):def;};
-    const ws=(raw)=>{const m=raw.match(/WS=(\d+)/);return m?parseInt(m[1]):null;};
-
     let i=0;
     while(i<toks.length){
       const {code,raw}=toks[i];
-      const wsid=ws(raw)??(ops.length+500);
+      const wsid=ws(raw)??autoWs++;
       if(wsid>maxWs)maxWs=wsid;
 
       if(code==='81'){
-        // Drill – #1002 = DIAMETER
-        ops.push({ws:wsid,side,type:'drill',x:g(raw,'1',0),y:g(raw,'2',0),z:g(raw,'3',0),dia:g(raw,'1002',8)});
+        const x=g(raw,'1',null), y=g(raw,'2',null), z=g(raw,'3',null), dia=g(raw,'1002',null);
+        const errors=[];
+        if(x===null)errors.push('brak X (#1)');
+        if(y===null)errors.push('brak Y (#2)');
+        if(z===null)errors.push('brak głęb. (#3)');
+        if(dia===null)errors.push('brak śr. (#1002)');
+        ops.push({ws:wsid,side,type:'drill',
+          x:x??0,y:y??0,z:z??0,dia:dia??8,
+          errors:errors.length?errors:null});
         i++;
 
       } else if(code==='89'){
-        // Collect W#2201 segments that immediately follow
-        // First point is from W#89 itself (#1, #2)
-        const startX=g(raw,'1',0),startY=g(raw,'2',0);
-        const pts=[{x:startX,y:startY}];
+        const startX=g(raw,'1',null),startY=g(raw,'2',null);
+        const pts=[{x:startX??0,y:startY??0}];
         let j=i+1;
         while(j<toks.length&&toks[j].code==='2201'){
           const px=g(toks[j].raw,'1'),py=g(toks[j].raw,'2');
@@ -383,32 +426,40 @@ function parseTCN(txt){
           j++;
         }
         if(pts.length>=2){
-          // Milling polyline
+          const errors=[];
+          if(startX===null)errors.push('brak X (#1)');
+          if(startY===null)errors.push('brak Y (#2)');
           ops.push({ws:wsid,side,type:'mill',
-            x:startX,y:startY,z:g(raw,'3',0),
-            toolNum:g(raw,'205',1200)|0,
-            pts});
+            x:startX??0,y:startY??0,z:g(raw,'3',0),
+            toolNum:(g(raw,'205',null)||1200)|0,
+            pts,errors:errors.length?errors:null});
           i=j;
         } else {
-          // Simple panel-saw cut (W#89 alone)
-          ops.push({ws:wsid,side,type:'saw',x:startX,y:startY,z:g(raw,'3',0),width:g(raw,'1001',3.6)});
+          ops.push({ws:wsid,side,type:'saw',
+            x:startX??0,y:startY??0,z:g(raw,'3',0),width:g(raw,'1001',3.6)});
           i++;
         }
 
       } else if(code==='1050'){
-        // Blade: cuts along X axis at constant Y
-        // #8510=X start, #8511=Y (const), #8517=X end, #8512=depth, #8503=slot width, #8516=tool
-        const x1=g(raw,'8510',0),y1=g(raw,'8511',0);
-        let x2=g(raw,'8517',EL.DL);
-        const dep=Math.abs(g(raw,'8512',-13));
-        const w=g(raw,'8503',4);
+        // Standard format: #8510=xStart #8511=yConst #8517=xEnd #8512=depth
+        // Alternative format: #8020=xStart #8021=yConst #8022=depth (older TPA)
+        let x1=g(raw,'8510',null)??g(raw,'8020',null);
+        let y1=g(raw,'8511',null)??g(raw,'8021',null);
+        let dep=g(raw,'8512',null)??g(raw,'8022',null);
+        let x2=g(raw,'8517',null);
+        const w=g(raw,'8503',3.6);
         const toolNum=(g(raw,'8516',1151))|0;
-        // Blade can also be Y-axis: detect if x1===x2 (then it's Y-direction)
+        const errors=[];
+        if(x1===null){errors.push('brak X start (#8510/#8020)');x1=0;}
+        if(y1===null){errors.push('brak Y (#8511/#8021)');y1=0;}
+        if(dep===null){errors.push('brak głęb. (#8512/#8022)');dep=13;}
+        if(x2===null){errors.push('brak X end (#8517)');x2=EL.DL;}
+        dep=Math.abs(dep);
         const isY=Math.abs(x2-x1)<0.01;
         ops.push({ws:wsid,side,type:'blade',
-          x:x1,y:y1,x2,y2:y1,  // for X-cut: same y; for Y-cut same x stored as x=x2
-          orient: isY?'y':'x',
-          z:-dep,width:w,toolNum});
+          x:x1,y:y1,x2,y2:y1,orient:isY?'y':'x',
+          z:-dep,width:w,toolNum,
+          errors:errors.length?errors:null});
         i++;
 
       } else { i++; }
@@ -416,7 +467,55 @@ function parseTCN(txt){
   }
   OPS=ops.sort((a,b)=>a.ws-b.ws);
   nextWs=maxWs+1;
+
+  // ── Detect new tools not in settings ─────────────────────────────
+  const newMillTools=new Set();
+  const newSawTools=new Set();
+  OPS.forEach(op=>{
+    if(op.type==='mill'){
+      const num=op.toolNum||1200;
+      if(!toolSettings.millTools.some(t=>t.num===num))newMillTools.add(num);
+    }
+    if(op.type==='blade'){
+      const num=op.toolNum||1151;
+      if(toolSettings.sawTools.length&&!toolSettings.sawTools.some(t=>t.num===num))
+        newSawTools.add(num);
+    }
+  });
+  // Schedule prompt after render
+  if(newMillTools.size||newSawTools.size){
+    setTimeout(()=>promptNewTools([...newMillTools],[...newSawTools]),400);
+  }
 }
+
+async function promptNewTools(newMill,newSaw){
+  if(newMill.length){
+    for(const num of newMill){
+      const add=confirm(`Plik zawiera frez #${num} nieznany w ustawieniach.\nCzy dodać go do listy frezów?`);
+      if(add){
+        const diaStr=prompt(`Podaj średnicę freza #${num} (mm):`, '8');
+        const dia=parseFloat(diaStr);
+        if(!isNaN(dia)&&dia>0){
+          toolSettings.millTools.push({num,dia});
+          IDB.set('toolSettings',toolSettings).catch(()=>{});
+          showToast(`✓ Dodano frez #${num} ⌀${dia}mm`);
+          buildScene();if(curView!=='3d')draw2D();
+        }
+      }
+    }
+  }
+  if(newSaw.length){
+    for(const num of newSaw){
+      const add=confirm(`Plik zawiera piłkę #${num} nieznana w ustawieniach.\nCzy dodać numer narzędzia piłki #${num}?`);
+      if(add){
+        toolSettings.sawTools.push({num});
+        IDB.set('toolSettings',toolSettings).catch(()=>{});
+        showToast(`✓ Dodano narzędzie piłki #${num}`);
+      }
+    }
+  }
+}
+
 
 /* ─── THREE.JS ─────────────────────────────────────────────────────── */
 function initThree(){
@@ -730,43 +829,31 @@ function filterSide(s){
 
 /* ─── ADD FORM ───────────────────────────────────────────────────── */
 function openAddForm(type){
-  addingType=type;millPts=[];
-  document.getElementById('add-title').textContent={drill:'Nowy nawiert',blade:'Nowa piłka (W#1050)',mill:'Nowe frezowanie'}[type];
-  const f=document.getElementById('add-fields');
-  f.innerHTML='';
+  // Smart defaults: place new op in a sensible position on the element
+  const defX=Math.round(EL.DL/2)||50;
+  const defY=Math.round(EL.DH/2)||50;
+  const ws=nextWs++;
+  let op;
+  const defMillTool=(toolSettings.millTools[0]?.num)||1200;
+  const defSawTool=(toolSettings.sawTools[0]?.num)||1151;
   if(type==='drill'){
-    f.innerHTML=`
-<div><label>Ściana</label><select id="af-side">${SIDES.map(s=>`<option>${s}</option>`).join('')}</select></div>
-<div><label>Średnica (mm)</label><input id="af-dia" type="number" value="8" step="0.5" min="0.5"></div>
-<div><label>X (mm)</label><input id="af-x" type="number" value="50" step="0.1"></div>
-<div><label>Y (mm)</label><input id="af-y" type="number" value="50" step="0.1"></div>
-<div><label>Głębokość (mm)</label><input id="af-z" type="number" value="10" step="0.5" min="0.1"></div>`;
+    op={ws,side:'TOP',type:'drill',x:defX,y:defY,z:-13,dia:8};
   } else if(type==='blade'){
-    f.innerHTML=`
-<div><label>Ściana</label><select id="af-side">${SIDES.map(s=>`<option>${s}</option>`).join('')}</select></div>
-<div><label>Narzędzie #8516</label><input id="af-tool" type="number" value="1151" step="1"></div>
-<div><label>X start (mm)</label><input id="af-x" type="number" value="0" step="0.1"></div>
-<div><label>Y = const (mm)</label><input id="af-y" type="number" value="100" step="0.1"></div>
-<div><label>X koniec (mm)</label><input id="af-x2" type="number" value="540" step="0.1"></div>
-<div><label>Głębokość (mm)</label><input id="af-z" type="number" value="13" step="0.5" min="0.1"></div>
-<div><label>Szerokość rowka (mm)</label><input id="af-w" type="number" value="4" step="0.5" min="0.1"></div>`;
+    op={ws,side:'TOP',type:'blade',x:0,y:defY,x2:EL.DL||600,y2:defY,orient:'x',z:-13,width:4,toolNum:defSawTool};
   } else if(type==='mill'){
-    f.innerHTML=`
-<div><label>Ściana</label><select id="af-side">${SIDES.map(s=>`<option>${s}</option>`).join('')}</select></div>
-<div><label>Narzędzie #205</label><input id="af-tool" type="number" value="1200" step="1"></div>
-<div><label>Głębokość (mm)</label><input id="af-z" type="number" value="10" step="0.5" min="0.1"></div>
-<div class="full">
-  <label>Wierzchołki (kliknij "+" by dodać)</label>
-  <div class="pts-list" id="af-pts"></div>
-  <div style="display:flex;gap:var(--s2)">
-    <input id="af-px" type="number" value="100" step="0.1" placeholder="X" style="flex:1;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px var(--s2);font-size:var(--tsm);color:var(--txt)">
-    <input id="af-py" type="number" value="100" step="0.1" placeholder="Y" style="flex:1;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px var(--s2);font-size:var(--tsm);color:var(--txt)">
-    <button class="btn btn-sec" onclick="addMillPt()" style="padding:4px 8px;font-size:var(--txs)">+</button>
-  </div>
-</div>`;
-    renderMillPts();
+    const x1=Math.round(EL.DL*0.2)||50,x2=Math.round(EL.DL*0.8)||200;
+    op={ws,side:'TOP',type:'mill',x:x1,y:defY,z:-10,toolNum:defMillTool,pts:[{x:x1,y:defY},{x:x2,y:defY}]};
   }
-  document.getElementById('add-form').classList.remove('hidden');
+  if(!op)return;
+  OPS.push(op);
+  selectOp(ws,false);
+  renderOps();buildScene();if(curView!=='3d')draw2D();
+  // Scroll new op card into view
+  setTimeout(()=>{
+    const el=document.querySelector(`.oi[data-ws="${ws}"]`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+  },80);
+  showToast('✓ Dodano – edytuj pozycję w liście');
 }
 const SIDES=['TOP','FRONT','BACK','RIGHT','LEFT'];
 function closeAddForm(){document.getElementById('add-form').classList.add('hidden');addingType=null;millPts=[];}
@@ -837,6 +924,22 @@ function deleteOp(ws){
 }
 
 /* ─── SIDEBAR LIST ───────────────────────────────────────────────── */
+/* Build a <select> for tool number from toolSettings */
+function millToolSelect(ws,cur){
+  const opts=toolSettings.millTools.map(t=>
+    `<option value="${t.num}"${t.num===cur?' selected':''}>#${t.num} ⌀${t.dia}mm</option>`
+  ).join('');
+  const fallback=!opts?`<option value="${cur||1200}">#${cur||1200}</option>`:'';
+  return `<select class="oi-sel" onchange="updOp(${ws},'toolNum',this.value)" onclick="event.stopPropagation()">${opts||fallback}</select>`;
+}
+function sawToolSelect(ws,cur){
+  const opts=toolSettings.sawTools.map(t=>
+    `<option value="${t.num}"${t.num===cur?' selected':''}>#${t.num}</option>`
+  ).join('');
+  const fallback=!opts?`<option value="${cur||1151}">#${cur||1151}</option>`:'';
+  return `<select class="oi-sel" onchange="updOp(${ws},'toolNum',this.value)" onclick="event.stopPropagation()">${opts||fallback}</select>`;
+}
+
 function renderOps(){
   const cont=document.getElementById('ops-list');
   const fil=curFilter==='ALL'?OPS:OPS.filter(o=>o.side===curFilter);
@@ -848,72 +951,72 @@ function renderOps(){
     g.innerHTML=`<div class="ogt">${lbl[side]||side}</div>`;
     gs[side].forEach(op=>{
       const it=document.createElement('div');
-      it.className='oi'+(selWs===op.ws?' sel':'');it.dataset.ws=op.ws;
+      it.className='oi'+(selWs===op.ws?' sel':'')+(op.errors?' has-error':'');it.dataset.ws=op.ws;
       let badge='',fields='';
       if(op.type==='drill'){
         badge=`Nawiert ⌀${fv(op.dia)}mm`;
         fields=`
-<div><span class="ol">X (mm)</span><input class="oi-in" type="number" value="${fv(op.x)}" step="0.1" onchange="updOp(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fv(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Średnica (mm)</span><input class="oi-in" type="number" value="${fv(op.dia)}" step="0.5" onchange="updOp(${op.ws},'dia',this.value)" onclick="event.stopPropagation()"></div>`;
+<div><span class="ol">X (mm)</span><input class="oi-in" type="number" value="${fvI(op.x)}" step="0.1" onchange="updOp(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Średnica (mm)</span><input class="oi-in" type="number" value="${fvI(op.dia)}" step="0.5" onchange="updOp(${op.ws},'dia',this.value)" onclick="event.stopPropagation()"></div>`;
       } else if(op.type==='saw'){
         badge='Piła (saw)';
         fields=`
-<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fv(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Szerokość (mm)</span><input class="oi-in" type="number" value="${fv(op.width||3.6)}" step="0.1" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>`;
+<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Szerokość (mm)</span><input class="oi-in" type="number" value="${fvI(op.width||3.6)}" step="0.1" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>`;
       } else if(op.type==='blade'){
         badge=`Piłka W#1050 (${op.orient==='y'?'⇕':'⇔'})`;
         if(op.orient==='x'){
           // X-cut: horizontal line at constant Y
           fields=`
-<div><span class="ol">X start</span><input class="oi-in" type="number" value="${fv(op.x)}" step="0.1" onchange="updBlade(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">X koniec</span><input class="oi-in" type="number" value="${fv(op.x2??EL.DL)}" step="0.1" onchange="updBlade(${op.ws},'x2',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Y = const</span><input class="oi-in" type="number" value="${fv(op.y)}" step="0.1" onchange="updBlade(${op.ws},'yconst',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Szerokość rowka</span><input class="oi-in" type="number" value="${fv(op.width||4)}" step="0.5" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Narzędzie #8516</span><input class="oi-in" type="number" value="${op.toolNum||1151}" step="1" onchange="updOp(${op.ws},'toolNum',this.value)" onclick="event.stopPropagation()"></div>`;
-        } else {
+<div><span class="ol">X start</span><input class="oi-in" type="number" value="${fvI(op.x)}" step="0.1" onchange="updBlade(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">X koniec</span><input class="oi-in" type="number" value="${fvI(op.x2??EL.DL)}" step="0.1" onchange="updBlade(${op.ws},'x2',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y = const</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updBlade(${op.ws},'yconst',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Szerokość rowka</span><input class="oi-in" type="number" value="${fvI(op.width||4)}" step="0.5" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Narzędzie #8516</span>${sawToolSelect(op.ws,op.toolNum||1151)}</div>`;
           // Y-cut: vertical line at constant X
           fields=`
-<div><span class="ol">X = const</span><input class="oi-in" type="number" value="${fv(op.x)}" step="0.1" onchange="updBlade(${op.ws},'xconst',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Y start</span><input class="oi-in" type="number" value="${fv(op.y)}" step="0.1" onchange="updBlade(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Y koniec</span><input class="oi-in" type="number" value="${fv(op.y2??0)}" step="0.1" onchange="updBlade(${op.ws},'y2',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Szerokość rowka</span><input class="oi-in" type="number" value="${fv(op.width||4)}" step="0.5" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Narzędzie #8516</span><input class="oi-in" type="number" value="${op.toolNum||1151}" step="1" onchange="updOp(${op.ws},'toolNum',this.value)" onclick="event.stopPropagation()"></div>`;
+<div><span class="ol">X = const</span><input class="oi-in" type="number" value="${fvI(op.x)}" step="0.1" onchange="updBlade(${op.ws},'xconst',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y start</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updBlade(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y koniec</span><input class="oi-in" type="number" value="${fvI(op.y2??0)}" step="0.1" onchange="updBlade(${op.ws},'y2',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Szerokość rowka</span><input class="oi-in" type="number" value="${fvI(op.width||4)}" step="0.5" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Narzędzie #8516</span>${sawToolSelect(op.ws,op.toolNum||1151)}</div>`;
         }
       } else if(op.type==='mill'){
         badge=`Frezowanie (${op.pts?.length||0} pkt)`;
         const ptsHtml=(op.pts||[]).map((p,i)=>`<div class="pt-row" style="font-size:var(--txs)">
           <span style="color:var(--faint);min-width:16px">${i+1}.</span>
-          X<input value="${fv(p.x)}" type="number" step="0.1" onchange="updMillPt(${op.ws},${i},'x',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
-          Y<input value="${fv(p.y)}" type="number" step="0.1" onchange="updMillPt(${op.ws},${i},'y',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+          X<input value="${fvI(p.x)}" type="number" step="0.1" onchange="updMillPt(${op.ws},${i},'x',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+          Y<input value="${fvI(p.y)}" type="number" step="0.1" onchange="updMillPt(${op.ws},${i},'y',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
           <button class="pt-del" onclick="event.stopPropagation();delMillPt(${op.ws},${i})">✕</button>
         </div>`).join('');
         fields=`
-<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Narzędzie #205</span><input class="oi-in" type="number" value="${op.toolNum||1200}" step="1" onchange="updOp(${op.ws},'toolNum',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Narzędzie #205</span>${millToolSelect(op.ws,op.toolNum||1200)}</div>
 <div style="grid-column:1/-1">
   <span class="ol">Wierzchołki</span>
   <div class="pts-list">${ptsHtml}</div>
-  <div style="display:flex;gap:3px;margin-top:4px;width:100%;box-sizing:border-box">
-    <span style="font-size:10px;color:var(--faint);padding-top:5px;white-space:nowrap">X</span>
-    <input id="mpt-x-${op.ws}" type="number" value="100" step="0.1" placeholder="X" onclick="event.stopPropagation()" style="min-width:0;flex:1;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:3px 3px;font-size:10px;color:var(--txt)">
-    <span style="font-size:10px;color:var(--faint);padding-top:5px;white-space:nowrap">Y</span>
-    <input id="mpt-y-${op.ws}" type="number" value="100" step="0.1" placeholder="Y" onclick="event.stopPropagation()" style="min-width:0;flex:1;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:3px 3px;font-size:10px;color:var(--txt)">
-    <button onclick="event.stopPropagation();addMillPtToOp(${op.ws})" style="flex-shrink:0;padding:3px 7px;font-size:11px;font-weight:700;background:var(--pri);color:#fff;border:none;border-radius:var(--rsm);cursor:pointer">+</button>
+  <div class="ofl" style="margin-top:4px">
+    <div><span class="ol">X (mm)</span><input id="mpt-x-${op.ws}" type="number" value="100" step="0.1" class="oi-in" onclick="event.stopPropagation()"></div>
+    <div style="display:flex;gap:4px;align-items:flex-end">
+      <div style="flex:1"><span class="ol">Y (mm)</span><input id="mpt-y-${op.ws}" type="number" value="100" step="0.1" class="oi-in" onclick="event.stopPropagation()"></div>
+      <button onclick="event.stopPropagation();addMillPtToOp(${op.ws})" style="flex-shrink:0;height:28px;padding:0 10px;font-size:15px;font-weight:700;background:var(--pri);color:#fff;border:none;border-radius:var(--rsm);cursor:pointer;margin-bottom:0">+</button>
+    </div>
   </div>
 </div>`;
       }
+      const errHtml=op.errors?`<div class="op-errors">⚠ ${op.errors.join(' · ')}</div>`:'';
       it.innerHTML=`<div class="oih">
   <span class="oid">WS=${op.ws}</span>
   <div style="display:flex;gap:var(--s1);align-items:center">
     <span class="otb ${op.type}">${badge}</span>
     <button class="btn-del" onclick="event.stopPropagation();deleteOp(${op.ws})" title="Usuń">✕</button>
   </div>
-</div><div class="ofl">${fields}</div>`;
+</div><div class="ofl">${fields}</div>${errHtml}`;
       it.addEventListener('click',e=>{if(['INPUT','BUTTON','SELECT'].includes(e.target.tagName))return;selectOp(op.ws,false);});
       g.appendChild(it);
     });
@@ -957,8 +1060,8 @@ function _refreshMillPtsList(ws){
   if(!container)return;
   container.innerHTML=op.pts.map((p,i)=>`<div class="pt-row" style="font-size:var(--txs)">
     <span style="color:var(--faint);min-width:16px">${i+1}.</span>
-    X<input value="${fv(p.x)}" type="number" step="0.1" onchange="updMillPt(${ws},${i},'x',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
-    Y<input value="${fv(p.y)}" type="number" step="0.1" onchange="updMillPt(${ws},${i},'y',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+    X<input value="${fvI(p.x)}" type="number" step="0.1" onchange="updMillPt(${ws},${i},'x',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+    Y<input value="${fvI(p.y)}" type="number" step="0.1" onchange="updMillPt(${ws},${i},'y',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
     <button class="pt-del" onclick="event.stopPropagation();delMillPt(${ws},${i})">✕</button>
   </div>`).join('');
   // Update badge count
@@ -976,10 +1079,10 @@ function selectOp(ws,scrollSb=false){
 function updBlade(ws,field,val){
   const op=OPS.find(o=>o.ws===ws);if(!op||op.type!=='blade')return;
   const v=parseFloat(val);if(isNaN(v))return;
-  if(field==='yconst'){op.y=v;op.y2=v;}         // X-cut: constant Y
-  else if(field==='xconst'){op.x=v;op.x2=v;}    // Y-cut: constant X
+  if(field==='yconst'){op.y=v;op.y2=v;}
+  else if(field==='xconst'){op.x=v;op.x2=v;}
   else op[field]=v;
-  renderOps();buildScene();if(curView!=='3d')draw2D();
+  buildScene();if(curView!=='3d')draw2D();
 }
 
 function updOp(ws,field,val){
@@ -989,7 +1092,10 @@ function updOp(ws,field,val){
   else if(field==='y'&&op.type==='blade'){op.y=v;op.y2=v;}
   else if(field==='toolNum')op.toolNum=parseInt(val)||op.toolNum;
   else op[field]=v;
-  renderOps();buildScene();if(curView!=='3d')draw2D();
+  // Only rebuild visuals, not sidebar (avoids losing input focus during live edit)
+  buildScene();if(curView!=='3d')draw2D();
+  // Update cnt-lbl silently
+  document.getElementById('cnt-lbl').textContent=`${OPS.length} operacji`;
 }
 
 function updateRotBtnWarning(){
@@ -1005,6 +1111,20 @@ function changeLabelFont(delta){
   document.querySelectorAll('.fb-name').forEach(el=>el.style.fontSize=labelFontSize+'px');
   // Redraw 2D if visible
   if(curView!=='3d')draw2D();
+}
+
+function newFile(){
+  OPS=[];selWs=null;fileHandle=null;fileDecSep='.';nextWs=1;
+  EL.DL=600;EL.DH=400;EL.DS=18;
+  document.getElementById('ed-dl').value=EL.DL;
+  document.getElementById('ed-dh').value=EL.DH;
+  document.getElementById('ed-ds').value=EL.DS;
+  fileName='nowy_element.TCN';
+  setLoadedState(true,fileName);
+  renderOps();buildScene(true);if(curView!=='3d')draw2D();
+  // Focus first dimension input so user can immediately change size
+  setTimeout(()=>document.getElementById('ed-dl').focus(),80);
+  showToast('✓ Nowy element – wpisz wymiary');
 }
 
 function updateEL(){
@@ -1369,7 +1489,19 @@ function rotate90CW(){
 }
 
 /* ─── EXPORT ─────────────────────────────────────────────────────── */
+/* Format number for TCN export using detected file decimal separator */
+function fmtTCN(v){
+  // Use up to 4 significant decimal places, strip trailing zeros
+  const s=parseFloat(v.toFixed(4)).toString();
+  return fileDecSep===',' ? s.replace('.',',') : s;
+}
+
 function buildTCNText(){
+  const errOps=OPS.filter(o=>o.errors&&o.errors.length);
+  if(errOps.length){
+    const names=errOps.map(o=>`WS=${o.ws} (${o.type})`).join(', ');
+    throw new Error(`Plik zawiera operacje z błędami: ${names}.\nUzupełnij lub usuń je przed zapisaniem.`);
+  }
   // Deduplicate drills (same side+x+y+z+dia)
   const seen=new Set();
   const ops=OPS.filter(op=>{
@@ -1377,30 +1509,28 @@ function buildTCNText(){
     const key=`${op.side}|${op.x}|${op.y}|${op.z}|${op.dia}`;
     if(seen.has(key))return false;seen.add(key);return true;
   });
+  const n=fmtTCN; // shorthand
   const sN={TOP:1,FRONT:3,RIGHT:4,BACK:5,LEFT:6};
   const sO=['TOP','FRONT','RIGHT','BACK','LEFT'];
   const lines=[];
   lines.push('TPA\\ALBATROS\\EDICAD\\02.00:1333:r0w0h0s4');
   lines.push('::SIDE=1;3;4;5;6;');
-  lines.push(`::UNm DL=${EL.DL} DH=${EL.DH} DS=${EL.DS}`);
+  lines.push(`::UNm DL=${n(EL.DL)} DH=${n(EL.DH)} DS=${n(EL.DS)}`);
   lines.push("'tcn version=2.4.14");lines.push("'code=ansi");
   lines.push('SIDE#0{');lines.push('}SIDE');
   sO.forEach(side=>{
     lines.push(`SIDE#${sN[side]}{`);lines.push(`$=${side}`);
     ops.filter(o=>o.side===side).forEach(o=>{
       if(o.type==='drill')
-        lines.push(`W#81{ ::WTp WS=${o.ws}  #8015=0 #1=${o.x} #2=${o.y} #3=${o.z} #1002=${o.dia} #201=1 #203=1 #1001=0 }W`);
+        lines.push(`W#81{ ::WTp WS=${o.ws}  #8015=0 #1=${n(o.x)} #2=${n(o.y)} #3=${n(o.z)} #1002=${n(o.dia)} #201=1 #203=1 #1001=0 }W`);
       else if(o.type==='saw')
-        lines.push(`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=${o.x} #2=${o.y} #3=${o.z} #201=1 #203=1 #205=1200 #1001=${o.width||3.6} #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 }W`);
+        lines.push(`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=${n(o.x)} #2=${n(o.y)} #3=${n(o.z)} #201=1 #203=1 #205=1200 #1001=${n(o.width||3.6)} #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 }W`);
       else if(o.type==='mill'&&o.pts?.length>=2){
-        // First point is start (in W#89), rest in W#2201
-        lines.push(`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=${o.pts[0].x} #2=${o.pts[0].y} #3=${o.z} #201=1 #203=1 #205=${o.toolNum||1200} #1001=1 #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 #8180=0 #8181=0 #8185=0 #8186=0 }W`);
-        o.pts.slice(1).forEach(p=>lines.push(`W#2201{ ::WTl  #8015=0 #1=${p.x} #2=${p.y} #3=${o.z} #42=0 #49=0 }W`));
+        lines.push(`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=${n(o.pts[0].x)} #2=${n(o.pts[0].y)} #3=${n(o.z)} #201=1 #203=1 #205=${o.toolNum||1200} #1001=1 #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 #8180=0 #8181=0 #8185=0 #8186=0 }W`);
+        o.pts.slice(1).forEach(p=>lines.push(`W#2201{ ::WTl  #8015=0 #1=${n(p.x)} #2=${n(p.y)} #3=${n(o.z)} #42=0 #49=0 }W`));
       } else if(o.type==='blade'){
-        // X-cut: #8510=x, #8511=y, #8517=x2
-        // Y-cut: #8510=x, #8511=y, #8517=x (same x, but different y via y2)
         const x1=o.x,y1=o.y,x2=o.orient==='y'?o.x:o.x2??x1;
-        lines.push(`W#1050{ ::WT2 WS=${o.ws}  #8098=..\\custom\\mcr\\lame.tmcr #6=1 #8015=0 #8503=${o.width||4} #8509=0 #8510=${x1} #8511=${y1} #8512=${o.z} #8513=${o.z} #8514=1 #8515=1 #8516=${o.toolNum||1151} #8517=${x2} #8525=2 #8526=0 #8527=1 }W`);
+        lines.push(`W#1050{ ::WT2 WS=${o.ws}  #8098=..\\custom\\mcr\\lame.tmcr #6=1 #8015=0 #8503=${n(o.width||4)} #8509=0 #8510=${n(x1)} #8511=${n(y1)} #8512=${n(o.z)} #8513=${n(o.z)} #8514=1 #8515=1 #8516=${o.toolNum||1151} #8517=${n(x2)} #8525=2 #8526=0 #8527=1 }W`);
       }
     });
     lines.push('}SIDE');
@@ -1410,7 +1540,8 @@ function buildTCNText(){
 
 async function saveTCN(){
   if(!LOADED)return;
-  const txt=buildTCNText();
+  let txt;
+  try{txt=buildTCNText();}catch(e){showToast(e.message,true);alert(e.message);return;}
   if(fileHandle){
     try{
       const w=await fileHandle.createWritable();
@@ -1425,7 +1556,8 @@ async function saveTCN(){
 
 async function saveTCNAs(){
   if(!LOADED)return;
-  const txt=buildTCNText();
+  let txt;
+  try{txt=buildTCNText();}catch(e){showToast(e.message,true);alert(e.message);return;}
   if('showSaveFilePicker' in window){
     try{
       const startRef=await IDB.get('lastHandle').catch(()=>null);
