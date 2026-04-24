@@ -1,0 +1,2161 @@
+<!DOCTYPE html>
+<html lang="pl" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>TPA Viewer</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+:root,[data-theme="light"]{--bg:#f7f6f2;--surf:#f9f8f5;--surf2:#fbfbf9;--surfoff:#f3f0ec;--surfdyn:#e6e4df;--div:#dcd9d5;--bord:#d4d1ca;--txt:#28251d;--muted:#7a7974;--faint:#bab9b4;--pri:#01696f;--prihov:#0c4e54;--warn:#964219;--ok:#437a22;--rsm:.375rem;--rmd:.5rem;--rlg:.75rem;--font:'Satoshi',sans-serif;--txs:clamp(.75rem,.7rem + .25vw,.875rem);--tsm:clamp(.875rem,.8rem + .35vw,1rem);--tbs:clamp(1rem,.95rem + .25vw,1.125rem);--s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s6:1.5rem;--s8:2rem;--tr:180ms cubic-bezier(.16,1,.3,1)}
+[data-theme="dark"]{--bg:#171614;--surf:#1c1b19;--surf2:#201f1d;--surfoff:#1d1c1a;--surfdyn:#2d2c2a;--div:#262523;--bord:#393836;--txt:#cdccca;--muted:#797876;--faint:#5a5957;--pri:#4f98a3;--prihov:#227f8b;--warn:#bb653b;--ok:#6daa45}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased}
+body{min-height:100dvh;font-family:var(--font,sans-serif);font-size:var(--tbs);color:var(--txt);background:var(--bg);display:grid;grid-template-rows:auto 1fr;overflow:hidden;height:100dvh}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none;transition:color var(--tr),background var(--tr),border-color var(--tr)}
+header{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) var(--s6);background:var(--surf);border-bottom:1px solid var(--bord);flex-wrap:wrap;z-index:10}
+.logo{display:flex;align-items:center;gap:var(--s2);font-weight:700;color:var(--pri)}
+.badge{font-size:var(--txs);background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px var(--s2);color:var(--muted);font-weight:500}
+.hact{display:flex;gap:var(--s2);margin-left:auto;align-items:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:var(--s1);padding:var(--s2) var(--s4);border-radius:var(--rmd);font-size:var(--tsm);font-weight:500;border:1px solid transparent}
+.btn-p{background:var(--pri);color:#fff}.btn-p:hover{background:var(--prihov)}
+.btn-ic{width:34px;height:34px;padding:0;justify-content:center;border-radius:var(--rmd);background:var(--surfoff);border:1px solid var(--bord)}.btn-ic:hover{background:var(--surfdyn)}
+.btn-sec{background:var(--surfoff);border:1px solid var(--bord)}.btn-sec:hover{background:var(--surfdyn)}
+.btn-tog{padding:var(--s1) var(--s3);border-radius:var(--rmd);font-size:var(--txs);font-weight:600;background:var(--surfoff);border:1px solid var(--bord);color:var(--muted)}.btn-tog.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.btn-del{padding:2px 7px;border-radius:var(--rsm);font-size:var(--txs);background:color-mix(in oklch,var(--warn) 12%,var(--surfoff));border:1px solid color-mix(in oklch,var(--warn) 30%,var(--bord));color:var(--warn)}.btn-del:hover{background:color-mix(in oklch,var(--warn) 25%,var(--surfoff))}
+/* main layout is set in browser panel CSS block below */
+.va{position:relative;overflow:hidden}
+.vtabs{position:absolute;top:var(--s4);left:var(--s4);display:flex;gap:2px;z-index:5;background:var(--surf);border:1px solid var(--bord);border-radius:var(--rlg);padding:3px}
+.tbtn{padding:var(--s1) var(--s3);border-radius:calc(var(--rlg) - 3px);font-size:var(--tsm);font-weight:500;color:var(--muted)}.tbtn.act{background:var(--pri);color:#fff}
+.dimbar{position:absolute;top:var(--s4);right:var(--s4);z-index:5;display:none}
+#c3d,#c2d{position:absolute;inset:0;width:100%;height:100%}
+#c2d{display:none}
+.hint{position:absolute;bottom:var(--s4);left:50%;transform:translateX(-50%);font-size:var(--txs);color:var(--faint);pointer-events:none;white-space:nowrap;background:color-mix(in oklch,var(--surf) 86%,transparent);padding:6px 10px;border-radius:999px;border:1px solid var(--bord)}
+.sb{background:var(--surf);border-left:1px solid var(--bord);display:flex;flex-direction:column;overflow:hidden}
+.sbh{padding:var(--s4) var(--s6);border-bottom:1px solid var(--div);flex-shrink:0}
+.sbh h2{font-size:var(--tsm);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:var(--s3)}
+.sbb{flex:1;overflow-y:auto;padding:var(--s4)}.sbb::-webkit-scrollbar{width:4px}.sbb::-webkit-scrollbar-thumb{background:var(--bord);border-radius:999px}
+.stabs{display:flex;gap:2px;background:var(--surfoff);border-radius:var(--rmd);padding:2px}
+.stab{flex:1;padding:var(--s1) 0;text-align:center;border-radius:calc(var(--rmd) - 2px);font-size:var(--txs);font-weight:600;color:var(--muted);cursor:pointer}.stab.act{background:var(--surf2);color:var(--txt)}
+.og{margin-bottom:var(--s6)}
+.ogt{font-size:var(--txs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:var(--s2)}
+.oi{background:var(--surf2);border:1px solid var(--bord);border-radius:var(--rmd);padding:var(--s3);margin-bottom:var(--s2);cursor:pointer}.oi:hover{border-color:var(--pri)}.oi.sel{border-color:var(--pri);box-shadow:0 0 0 1px var(--pri);background:color-mix(in oklch,var(--pri) 6%,var(--surf2))}
+.oih{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--s2)}
+.oid{font-size:var(--txs);font-weight:700;color:var(--pri)}
+.otb{font-size:var(--txs);padding:1px 6px;border-radius:999px;background:var(--surfoff)}
+.otb.drill{background:color-mix(in oklch,var(--pri) 15%,var(--surfoff))}
+.otb.saw,.otb.blade{background:color-mix(in oklch,var(--warn) 15%,var(--surfoff));color:var(--warn)}
+.otb.mill{background:color-mix(in oklch,var(--ok) 12%,var(--surfoff));color:var(--ok)}
+.ofl{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2)}
+.ol{font-size:var(--txs);color:var(--faint);font-weight:500;display:block;margin-bottom:2px}
+.oi-in{width:100%;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px var(--s2);font-size:var(--tsm);text-align:right}.oi-in:focus{outline:none;border-color:var(--pri)}
+.oi-sel{width:100%;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px var(--s2);font-size:var(--tsm);color:var(--txt)}.oi-sel:focus{outline:none;border-color:var(--pri)}
+.box{background:var(--surf2);border:1px solid var(--bord);border-radius:var(--rlg);padding:var(--s4);margin-bottom:var(--s6)}.box h3{font-size:var(--tsm);font-weight:600;margin-bottom:var(--s3)}
+.dimgr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--s2)}
+.dimf label{display:block;font-size:var(--txs);color:var(--muted);margin-bottom:2px}
+.dimf input{width:100%;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:var(--s2);font-size:var(--tsm);text-align:center}
+.rot-row{margin-top:var(--s3);display:flex;justify-content:flex-end}
+.fileline{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
+.pill-ok,.pill-warn{font-size:var(--txs);padding:2px 8px;border-radius:999px;border:1px solid var(--bord)}
+.pill-ok{background:color-mix(in oklch,var(--ok) 15%,var(--surfoff));color:var(--ok)}
+.pill-warn{background:color-mix(in oklch,var(--warn) 10%,var(--surfoff));color:var(--warn)}
+.toast{position:fixed;bottom:var(--s8);left:50%;transform:translateX(-50%) translateY(20px);background:var(--ok);color:#fff;padding:var(--s3) var(--s6);border-radius:999px;font-size:var(--tsm);font-weight:500;opacity:0;transition:opacity 300ms,transform 300ms;pointer-events:none;z-index:100}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.hidden{display:none !important}
+/* Settings modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--surf);border:1px solid var(--bord);border-radius:var(--rlg);width:560px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.4)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:var(--s4) var(--s6);border-bottom:1px solid var(--bord);flex-shrink:0}
+.modal-head h2{font-size:var(--tbs);font-weight:700}
+.modal-close{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--rsm);background:var(--surfoff);border:1px solid var(--bord);cursor:pointer;font-size:14px}.modal-close:hover{background:var(--surfdyn)}
+.modal-body{flex:1;overflow-y:auto;padding:var(--s6)}.modal-body::-webkit-scrollbar{width:4px}.modal-body::-webkit-scrollbar-thumb{background:var(--bord);border-radius:999px}
+.modal-section{margin-bottom:var(--s8)}
+.modal-section h3{font-size:var(--tsm);font-weight:700;margin-bottom:var(--s1);color:var(--txt)}
+.modal-section p{font-size:var(--txs);color:var(--muted);margin-bottom:var(--s3)}
+.tool-table{width:100%;border-collapse:collapse;font-size:var(--tsm)}
+.tool-table th{text-align:left;font-size:var(--txs);color:var(--faint);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--bord)}
+.tool-table td{padding:4px 6px;border-bottom:1px solid var(--div)}
+.tool-table input{width:100%;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px 6px;font-size:var(--tsm);color:var(--txt);text-align:right}.tool-table input:focus{outline:none;border-color:var(--pri)}
+.tool-table .td-del{width:32px;text-align:center}
+.modal-foot{padding:var(--s4) var(--s6);border-top:1px solid var(--bord);display:flex;gap:var(--s2);justify-content:flex-end;flex-shrink:0}
+/* Add form */
+.add-bar{display:flex;gap:var(--s2);flex-wrap:wrap;margin-bottom:var(--s4)}
+.add-bar button{flex:1;min-width:100px}
+.add-form{background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rmd);padding:var(--s3);margin-bottom:var(--s4)}
+.add-form h4{font-size:var(--txs);font-weight:700;color:var(--muted);margin-bottom:var(--s3)}
+.add-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2)}
+.add-grid label{display:block;font-size:var(--txs);color:var(--faint);margin-bottom:2px}
+.add-grid input,.add-grid select{width:100%;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px var(--s2);font-size:var(--tsm);color:var(--txt)}
+.add-grid .full{grid-column:1/-1}
+.add-actions{display:flex;gap:var(--s2);margin-top:var(--s3)}
+.add-add{flex:1;background:var(--pri);color:#fff;border-radius:var(--rmd);padding:var(--s2);font-size:var(--txs);font-weight:600;border:none;cursor:pointer}.add-add:hover{background:var(--prihov)}
+.add-cancel{background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rmd);padding:var(--s2);font-size:var(--txs);cursor:pointer}.add-cancel:hover{background:var(--surfdyn)}
+/* ── FILE BROWSER PANEL ──────────────────────────────────────────── */
+.fbr{background:var(--surf);border-right:1px solid var(--bord);display:flex;flex-direction:column;overflow:hidden;min-width:180px;max-width:700px;width:280px;flex-shrink:0}
+.fbr-head{padding:var(--s3) var(--s3) var(--s2);border-bottom:1px solid var(--bord);flex-shrink:0}
+.fbr-head h2{font-size:var(--txs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:var(--s2)}
+.fbr-search{position:relative;margin-bottom:var(--s2)}
+.fbr-search input{width:100%;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:5px 28px 5px 8px;font-size:var(--txs);color:var(--txt)}.fbr-search input:focus{outline:none;border-color:var(--pri)}
+.fbr-search .si{position:absolute;right:7px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
+.fbr-tools{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.fbr-sort{font-size:10px;padding:2px 6px;border-radius:var(--rsm);background:var(--surfoff);border:1px solid var(--bord);color:var(--muted);cursor:pointer}.fbr-sort.act{background:var(--pri);color:#fff;border-color:var(--pri)}
+.fbr-size{-webkit-appearance:none;appearance:none;width:70px;height:4px;border-radius:2px;background:var(--bord);outline:none;cursor:pointer}.fbr-size::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--pri)}
+.add-op-btn{flex-direction:column !important;gap:1px !important;padding:6px 4px !important;font-size:var(--txs) !important;line-height:1.1}
+.add-plus{font-size:16px;font-weight:300;line-height:1;color:var(--pri)}
+.fbr-count{font-size:10px;color:var(--faint);margin-left:auto}
+.fbr-list{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px}.fbr-list::-webkit-scrollbar{width:4px}.fbr-list::-webkit-scrollbar-thumb{background:var(--bord);border-radius:999px}
+.fbr-spacer-t,.fbr-spacer-b{width:100%;flex-shrink:0}
+.fb-item{border-radius:var(--rsm);padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;border:1px solid transparent;transition:border-color var(--tr),background var(--tr)}.fb-item:hover{border-color:var(--pri);background:color-mix(in oklch,var(--pri) 5%,var(--surf2))}.fb-item.fbact{border-color:var(--pri);background:color-mix(in oklch,var(--pri) 10%,var(--surf2));box-shadow:0 0 0 1px var(--pri)}
+.fb-thumb{background:var(--surfoff);border-radius:3px;display:block;image-rendering:pixelated}
+.fb-name{font-size:9px;color:var(--txt);text-align:center;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}
+.fb-meta{font-size:8px;color:var(--faint);text-align:center}
+.fbr-foot{padding:var(--s2) var(--s3);border-top:1px solid var(--bord);flex-shrink:0;display:flex;gap:var(--s2);align-items:center}
+.fbr-foot button{flex:1;font-size:var(--txs);padding:5px 8px;border-radius:var(--rsm)}
+.fbr-status{font-size:10px;color:var(--faint)}
+/* Resizer */
+.rz{width:5px;flex-shrink:0;cursor:col-resize;background:transparent;transition:background var(--tr)}.rz:hover,.rz.rzdrag{background:var(--pri)}
+/* Main 3-column layout */
+main{display:flex;overflow:hidden}
+.va{flex:1;position:relative;overflow:hidden}
+.sb{width:360px;flex-shrink:0}
+
+.pts-list{background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:var(--s2);margin-bottom:var(--s2);max-height:100px;overflow-y:auto}
+.pt-row{display:flex;align-items:center;gap:var(--s1);font-size:var(--txs);margin-bottom:2px}
+.pt-row input{flex:1;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px var(--s1);font-size:var(--txs);text-align:right;width:60px}
+.pt-del{padding:1px 5px;border-radius:var(--rsm);font-size:10px;background:color-mix(in oklch,var(--warn) 12%,var(--surfoff));border:1px solid color-mix(in oklch,var(--warn) 30%,var(--bord));color:var(--warn);cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="1" y="6" width="22" height="12" rx="2" fill="currentColor" opacity="0.15" stroke="currentColor" stroke-width="1.5"/><circle cx="5.5" cy="12" r="1.8" fill="currentColor"/><circle cx="18.5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>
+    TPA Viewer
+  </div>
+  <span class="badge file-badge hidden" id="file-name-badge" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+  <span class="badge" id="dim-lbl" style="display:none">—</span>
+  <span class="badge" id="cnt-lbl" style="display:none">0 operacji</span>
+  <div class="hact">
+    <input id="fileInput" type="file" accept=".tcn,.TCN,.txt" class="hidden"/>
+    <button class="btn btn-sec" id="saveBtn" onclick="saveTCN()" disabled>Zapisz</button>
+    <button class="btn btn-sec" id="saveAsBtn" onclick="saveTCNAs()" disabled>Zapisz jako…</button>
+    <button class="btn-ic" onclick="openSettings()" title="Ustawienia narzędzi">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    </button>
+    <div style="display:flex;gap:2px">
+      <button class="btn-ic" onclick="changeLabelFont(-1)" title="Zmniejsz czcionkę etykiet" style="font-size:11px;font-weight:700">A-</button>
+      <button class="btn-ic" onclick="changeLabelFont(+1)" title="Zwiększ czcionkę etykiet" style="font-size:11px;font-weight:700">A+</button>
+    </div>
+    <button class="btn-ic" data-theme-toggle aria-label="Motyw">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+<main>
+  <!-- FILE BROWSER -->
+  <div class="fbr" id="fbr">
+    <div class="fbr-head">
+      <h2>Katalog plików</h2>
+      <div class="fbr-search">
+        <input id="fbr-search" type="text" placeholder="Szukaj… (lub skaner)" autocomplete="off" spellcheck="false"/>
+        <svg class="si" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+      <div class="fbr-tools">
+        <button class="fbr-sort act" id="sort-name" onclick="setBrSort('name')">Nazwa</button>
+        <button class="fbr-sort" id="sort-date" onclick="setBrSort('date')">Data ↓</button>
+        <input class="fbr-size" id="fbr-size" type="range" min="80" max="400" value="110" title="Rozmiar miniatury" oninput="setBrThumbSize(+this.value)">
+        <span class="fbr-count" id="fbr-count">—</span>
+      </div>
+    </div>
+    <div class="fbr-list" id="fbr-list" onscroll="brOnScroll()">
+      <div class="fbr-spacer-t" id="fbr-spt"></div>
+      <div id="fbr-items"></div>
+      <div class="fbr-spacer-b" id="fbr-spb"></div>
+    </div>
+    <div class="fbr-foot">
+      <button class="btn btn-sec" onclick="brPickDir()" style="font-size:var(--txs);padding:5px 8px">📁 Katalog</button>
+      <span class="fbr-status" id="fbr-status">Brak katalogu</span>
+    </div>
+    <div id="fbr-restore-bar" class="hidden" style="padding:var(--s2) var(--s3);background:color-mix(in oklch,var(--warn) 12%,var(--surf));border-top:1px solid color-mix(in oklch,var(--warn) 30%,var(--bord));flex-shrink:0">
+      <button onclick="brRestoreDir()" style="width:100%;background:var(--warn);color:#fff;border:none;border-radius:var(--rsm);padding:6px 8px;font-size:var(--txs);font-weight:600;cursor:pointer">
+        🔓 Kliknij aby przywrócić ostatni katalog
+      </button>
+    </div>
+  </div>
+  <div class="rz" id="rz"></div>
+  <div class="va" id="va">
+    <div class="vtabs">
+      <button class="tbtn act" id="tab-3d" onclick="switchView('3d')">3D</button>
+      <button class="tbtn" id="tab-2d" onclick="switchView('2d')">TOP</button>
+      <button class="tbtn" id="tab-front" onclick="switchView('front')">FRONT</button>
+      <button class="tbtn" id="tab-back" onclick="switchView('back')">BACK</button>
+      <button class="tbtn" id="tab-right" onclick="switchView('right')">RIGHT</button>
+      <button class="tbtn" id="tab-left" onclick="switchView('left')">LEFT</button>
+    </div>
+    <div class="dimbar" id="dimbar" style="display:none">
+      <button class="btn-tog on" id="btn-dims" onclick="toggleDims()">📐 Wymiary</button>
+    </div>
+    <div class="dimbar" id="xray-bar">
+      <button class="btn-tog" id="btn-xray" onclick="toggleXray()">👁 Przeźroczyste</button>
+    </div>
+    <canvas id="c3d"></canvas>
+    <canvas id="c2d"></canvas>
+    <div class="hint" id="hint">Lewy: obrót · Prawy: przesuw · Scroll: zoom</div>
+  </div>
+  <aside class="sb">
+    <div class="sbh" style="border-bottom:none;padding-bottom:0">
+      <h2>Operacje</h2>
+    </div>
+    <div class="sbb">
+      <div class="box">
+        <h3>Wymiary elementu</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--s2);margin-bottom:var(--s3)">
+          <div class="dimf"><label>Dług. (mm)</label><input type="number" id="ed-dl" value="0" onchange="updateEL()"></div>
+          <div class="dimf"><label>Wys. (mm)</label><input type="number" id="ed-dh" value="0" onchange="updateEL()"></div>
+          <div class="dimf"><label>Grub. (mm)</label><input type="number" id="ed-ds" value="0" onchange="updateEL()"></div>
+        </div>
+        <button class="btn btn-sec" id="rotBtn" onclick="rotate90CW()" disabled style="width:100%;justify-content:center">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
+          <span id="rotBtn-label">Obróć 90° (TOP)</span>
+          <span id="rotBtn-warn" style="display:none;color:#f59e0b;font-size:20px;line-height:1" title="Element zawiera piłkę – zostanie usunięta przy obrocie">⚠</span>
+        </button>
+      </div>
+      <div id="ops-list"></div>
+      <div id="add-wrap" class="hidden">
+        <div class="add-bar">
+          <button class="btn btn-sec add-op-btn" onclick="openAddForm('drill')"><span class="add-plus">+</span>Nawiert</button>
+          <button class="btn btn-sec add-op-btn" onclick="openAddForm('blade')"><span class="add-plus">+</span>Piłka</button>
+          <button class="btn btn-sec add-op-btn" onclick="openAddForm('mill')"><span class="add-plus">+</span>Frezowanie</button>
+        </div>
+        <div class="add-form hidden" id="add-form">
+          <h4 id="add-title">Nowa operacja</h4>
+          <div class="add-grid" id="add-fields"></div>
+          <div class="add-actions">
+            <button class="add-add" onclick="commitAdd()">Dodaj</button>
+            <button class="add-cancel" onclick="closeAddForm()">Anuluj</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</main>
+<div class="modal-bg hidden" id="settings-modal" onclick="e=>e.target===this&&closeSettings()">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>⚙ Ustawienia narzędzi</h2>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <h3>Skaner kodów kreskowych</h3>
+        <p>Maksymalny czas między znakami (ms). Skaner wysyła znaki szybciej niż człowiek. Zmniejsz jeśli znaki trafiają do aktywnych pól zamiast wyszukiwarki.</p>
+        <table class="tool-table">
+          <thead><tr><th>Parametr</th><th style="width:120px">Wartość</th></tr></thead>
+          <tbody>
+            <tr><td>Maks. czas między znakami (ms)</td><td><input type="number" id="set-bgap" value="80" min="20" max="300" step="5"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-section">
+        <p>Wpisz numer freza (#205) i jego średnicę. Ścieżka frezowania będzie rysowana z odpowiednią szerokością na rzutach 2D.</p>
+        <table class="tool-table" id="mill-tools-table">
+          <thead><tr><th>Nr narzędzia (#205)</th><th>Średnica (mm)</th><th></th></tr></thead>
+          <tbody id="mill-tools-body"></tbody>
+        </table>
+        <button class="btn btn-sec" style="margin-top:var(--s3);font-size:var(--txs)" onclick="addMillToolRow()">+ Dodaj frez</button>
+      </div>
+      <div class="modal-section">
+        <h3>Piłki – numery narzędzi (#8516)</h3>
+        <p>Wpisz numery narzędzi piłki. Operacje W#1050 z tymi numerami będą wyświetlane jako piłki. Puste = wyświetlaj wszystkie.</p>
+        <table class="tool-table" id="saw-tools-table">
+          <thead><tr><th>Nr narzędzia (#8516)</th><th></th></tr></thead>
+          <tbody id="saw-tools-body"></tbody>
+        </table>
+        <button class="btn btn-sec" style="margin-top:var(--s3);font-size:var(--txs)" onclick="addSawToolRow()">+ Dodaj numer piłki</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-sec" onclick="closeSettings()">Anuluj</button>
+      <button class="btn btn-p" onclick="saveSettings()">Zapisz ustawienia</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+let EL={DL:0,DH:0,DS:0};
+let OPS=[];
+let LOADED=false;
+let selWs=null,curFilter='ALL',curView='3d',showDims=true,xrayMode=false;
+
+/* ── Operation colour palette (dark / light theme) ── */
+const OPC={
+  drill:   {d:'#22c55e', l:'#16a34a', hd:0x22c55e, hl:0x16a34a},  // zielony
+  through: {d:'#3b82f6', l:'#2563eb', hd:0x3b82f6, hl:0x2563eb},  // niebieski
+  blade:   {d:'#14b8a6', l:'#0d9488', hd:0x14b8a6, hl:0x0d9488},  // turkusowy
+  mill:    {d:'#a855f7', l:'#9333ea', hd:0xa855f7, hl:0x9333ea},   // fioletowy
+  sel:     {d:'#ef4444', l:'#dc2626', hd:0xef4444, hl:0xdc2626},   // czerwony
+};
+function opc(key){const dk_=dk();return OPC[key]?.[dk_?'d':'l']||'#fff';}
+function oph(key){const dk_=dk();return OPC[key]?.[dk_?'hd':'hl']||0xffffff;}
+let nextWs=1000;
+let labelFontSize=11; // px – used for 2D dimension labels and file names
+let fileHandle=null;   // File System Access API handle (for overwrite save)
+let fileName='element.TCN';
+let addingType=null;   // 'drill'|'blade'|'mill'
+let millPts=[];        // working point list for mill add form
+let cameraFitted=false; // don't reset camera on every rebuild
+
+const c3d=document.getElementById('c3d');
+const c2d=document.getElementById('c2d');
+const ctx=c2d.getContext('2d');
+let scene,cam,ren,controls,bGroup,markers=[];
+
+const dk=()=>document.documentElement.getAttribute('data-theme')==='dark';
+function showToast(msg,err=false){const t=document.getElementById('toast');t.textContent=msg;t.style.background=err?'var(--warn)':'var(--ok)';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function fv(v){const r=Math.round(v*100)/100;const s=r.toFixed(2);return s.endsWith('.00')?s.slice(0,-3):s.replace(/(\.\d)0$/,'$1');}
+
+/* ─── STATE ────────────────────────────────────────────────────────── */
+function setLoadedState(ok,name=''){
+  LOADED=ok;fileName=name||'element.TCN';
+  ['saveBtn','saveAsBtn','rotBtn'].forEach(id=>document.getElementById(id).disabled=!ok);
+  document.getElementById('add-wrap').classList.toggle('hidden',!ok);
+  // Header file name badge
+  const nb=document.getElementById('file-name-badge');
+  const dl=document.getElementById('dim-lbl');
+  const cl=document.getElementById('cnt-lbl');
+  if(ok){
+    nb.textContent=name;  // full name with extension
+    nb.classList.remove('hidden');
+    dl.textContent=`${EL.DL} × ${EL.DH} × ${EL.DS} mm`;
+    dl.style.display='';
+    cl.textContent=`${OPS.length} operacji`;
+    cl.style.display='';
+  } else {
+    nb.classList.add('hidden');
+    dl.style.display='none';
+    cl.style.display='none';
+  }
+}
+
+/* ─── PARSER ─────────────────────────────────────────────────────── */
+function parseTCN(txt){
+  const dim=txt.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)\s+DS=([\d.\-]+)/i);
+  if(!dim)throw new Error('Brak ::UNm');
+  EL.DL=parseFloat(dim[1]);EL.DH=parseFloat(dim[2]);EL.DS=parseFloat(dim[3]);
+  document.getElementById('ed-dl').value=EL.DL;
+  document.getElementById('ed-dh').value=EL.DH;
+  document.getElementById('ed-ds').value=EL.DS;
+
+  const sideMap={1:'TOP',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  const sideRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
+  const ops=[];let maxWs=0;let sm;
+
+  while((sm=sideRe.exec(txt))){
+    const side=sideMap[parseInt(sm[1])]||`SIDE${sm[1]}`;
+    const tokRe=/W#(\d+)\{([\s\S]*?)\}W/g;
+    const toks=[];let t;
+    while((t=tokRe.exec(sm[2])))toks.push({code:t[1],raw:t[2]});
+
+    const g=(raw,k,def=null)=>{const m=raw.match(new RegExp('#'+k+'=([\\d.\\-]+)'));return m?parseFloat(m[1]):def;};
+    const ws=(raw)=>{const m=raw.match(/WS=(\d+)/);return m?parseInt(m[1]):null;};
+
+    let i=0;
+    while(i<toks.length){
+      const {code,raw}=toks[i];
+      const wsid=ws(raw)??(ops.length+500);
+      if(wsid>maxWs)maxWs=wsid;
+
+      if(code==='81'){
+        // Drill – #1002 = DIAMETER
+        ops.push({ws:wsid,side,type:'drill',x:g(raw,'1',0),y:g(raw,'2',0),z:g(raw,'3',0),dia:g(raw,'1002',8)});
+        i++;
+
+      } else if(code==='89'){
+        // Collect W#2201 segments that immediately follow
+        // First point is from W#89 itself (#1, #2)
+        const startX=g(raw,'1',0),startY=g(raw,'2',0);
+        const pts=[{x:startX,y:startY}];
+        let j=i+1;
+        while(j<toks.length&&toks[j].code==='2201'){
+          const px=g(toks[j].raw,'1'),py=g(toks[j].raw,'2');
+          if(px!==null&&py!==null)pts.push({x:px,y:py});
+          j++;
+        }
+        if(pts.length>=2){
+          // Milling polyline
+          ops.push({ws:wsid,side,type:'mill',
+            x:startX,y:startY,z:g(raw,'3',0),
+            toolNum:g(raw,'205',1200)|0,
+            pts});
+          i=j;
+        } else {
+          // Simple panel-saw cut (W#89 alone)
+          ops.push({ws:wsid,side,type:'saw',x:startX,y:startY,z:g(raw,'3',0),width:g(raw,'1001',3.6)});
+          i++;
+        }
+
+      } else if(code==='1050'){
+        // Blade: cuts along X axis at constant Y
+        // #8510=X start, #8511=Y (const), #8517=X end, #8512=depth, #8503=slot width, #8516=tool
+        const x1=g(raw,'8510',0),y1=g(raw,'8511',0);
+        let x2=g(raw,'8517',EL.DL);
+        const dep=Math.abs(g(raw,'8512',-13));
+        const w=g(raw,'8503',4);
+        const toolNum=(g(raw,'8516',1151))|0;
+        // Blade can also be Y-axis: detect if x1===x2 (then it's Y-direction)
+        const isY=Math.abs(x2-x1)<0.01;
+        ops.push({ws:wsid,side,type:'blade',
+          x:x1,y:y1,x2,y2:y1,  // for X-cut: same y; for Y-cut same x stored as x=x2
+          orient: isY?'y':'x',
+          z:-dep,width:w,toolNum});
+        i++;
+
+      } else { i++; }
+    }
+  }
+  OPS=ops.sort((a,b)=>a.ws-b.ws);
+  nextWs=maxWs+1;
+}
+
+/* ─── THREE.JS ─────────────────────────────────────────────────────── */
+function initThree(){
+  const va=document.getElementById('va');
+  scene=new THREE.Scene();
+  cam=new THREE.PerspectiveCamera(42,va.clientWidth/va.clientHeight,.1,20000);
+  cam.position.set(900,700,1200);
+  ren=new THREE.WebGLRenderer({canvas:c3d,antialias:true,alpha:true});
+  ren.setPixelRatio(devicePixelRatio);ren.setSize(va.clientWidth,va.clientHeight);
+  scene.add(new THREE.AmbientLight(0xffffff,.6));
+  const sun=new THREE.DirectionalLight(0xfff5e0,1.05);sun.position.set(800,1000,600);scene.add(sun);
+  const fill=new THREE.DirectionalLight(0xb0d0ff,.3);fill.position.set(-500,200,-300);scene.add(fill);
+  controls=new THREE.OrbitControls(cam,c3d);
+  controls.enableDamping=true;controls.dampingFactor=.08;
+  controls.screenSpacePanning=true;controls.panSpeed=1.1;
+  controls.rotateSpeed=.7;controls.zoomSpeed=.95;
+  controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};
+  controls.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN};
+  controls.target.set(0,0,0);controls.update();
+  c3d.addEventListener('click',onC3Click);
+  window.addEventListener('resize',onResize);
+  animate();buildScene();
+}
+function onResize(){const va=document.getElementById('va');cam.aspect=va.clientWidth/va.clientHeight;cam.updateProjectionMatrix();ren.setSize(va.clientWidth,va.clientHeight);if(curView!=='3d')draw2D();}
+function fitCamera(){if(!controls)return;const m=Math.max(EL.DL||100,EL.DH||100,EL.DS||18);cam.position.set(m*1.3,m*.9,m*1.4);controls.target.set(0,0,0);controls.update();}
+
+function toggleXray(){
+  xrayMode=!xrayMode;
+  document.getElementById('btn-xray').classList.toggle('on',xrayMode);
+  buildScene();
+}
+
+function buildScene(resetCam=false){
+  if(!scene)return;
+  markers=[];
+  if(bGroup){scene.remove(bGroup);bGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();});}
+  bGroup=new THREE.Group();scene.add(bGroup);
+  if(!LOADED||!EL.DL||!EL.DH||!EL.DS){fitCamera();cameraFitted=false;return;}
+  const d=dk();
+  const boardMat=new THREE.MeshStandardMaterial({
+    color:d?0x7a4820:0xb87a3a,roughness:.86,
+    transparent:xrayMode,opacity:xrayMode?0.18:1,
+    depthWrite:!xrayMode,side:xrayMode?THREE.DoubleSide:THREE.FrontSide
+  });
+  bGroup.add(new THREE.Mesh(new THREE.BoxGeometry(EL.DL,EL.DS,EL.DH),boardMat));
+  // Board wireframe in xray mode
+  if(xrayMode){
+    const edges=new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(EL.DL,EL.DS,EL.DH)),
+      new THREE.LineBasicMaterial({color:d?0x4f98a3:0x01696f,opacity:0.5,transparent:true})
+    );
+    bGroup.add(edges);
+  }
+  OPS.forEach(op=>{
+    if(op.type==='drill')bldDrill(op);
+    else if(op.type==='saw')bldSaw(op);
+    else if(op.type==='blade')bldBlade(op);
+    else if(op.type==='mill')bldMill(op);
+  });
+  applySel();
+  if(resetCam||!cameraFitted){fitCamera();cameraFitted=true;}
+}
+
+function isDrillThrough(op){
+  return op.type==='drill' && op.side==='TOP' && Math.abs(op.z)>=EL.DS;
+}
+
+function bldDrill(op){
+  const d=dk(),dep=Math.abs(op.z),R=Math.max(.5,(op.dia||8)/2),PI=Math.PI;
+  const through=isDrillThrough(op);
+  const holeCol=oph(through?'through':'drill');
+  const mat=new THREE.MeshStandardMaterial({color:holeCol,roughness:.6,
+    emissive:holeCol,emissiveIntensity:.15});
+  const cyl=new THREE.Mesh(new THREE.CylinderGeometry(R,R,Math.max(1,dep+1.6),32),mat);
+  const mkr=new THREE.Mesh(new THREE.CylinderGeometry(R+5,R+5,8,24),new THREE.MeshBasicMaterial({visible:false}));
+  mkr.userData={op};
+  if(op.side==='TOP'){
+    // X=0 left, Y=0 bottom-front
+    const px=op.x-EL.DL/2, pz=EL.DH/2-op.y;
+    cyl.position.set(px,EL.DS/2-dep/2,pz);mkr.position.set(px,EL.DS/2+2,pz);
+  } else if(op.side==='FRONT'){
+    // FRONT at +Z face. Mirrored along #1: px = op.x - DL/2. Y=0 bottom.
+    const px=op.x-EL.DL/2, py=op.y-EL.DS/2;
+    cyl.rotation.set(PI/2,0,0);cyl.position.set(px,py, EL.DH/2-dep/2);
+    mkr.rotation.set(PI/2,0,0);mkr.position.set(px,py, EL.DH/2+2);
+  } else if(op.side==='BACK'){
+    // BACK at -Z face. px = op.x - DL/2. Y=0 bottom.
+    const px=op.x-EL.DL/2, py=op.y-EL.DS/2;
+    cyl.rotation.set(PI/2,0,0);cyl.position.set(px,py,-EL.DH/2+dep/2);
+    mkr.rotation.set(PI/2,0,0);mkr.position.set(px,py,-EL.DH/2-2);
+  } else if(op.side==='RIGHT'){
+    // RIGHT: +DL/2 face. pz = DH/2 - op.x (X=0 at +Z). Y=0 bottom.
+    const pz=EL.DH/2-op.x, py=op.y-EL.DS/2;
+    cyl.rotation.set(0,0,-PI/2);cyl.position.set(EL.DL/2-dep/2,py,pz);
+    mkr.rotation.set(0,0,-PI/2);mkr.position.set(EL.DL/2+2,py,pz);
+  } else if(op.side==='LEFT'){
+    // LEFT: -DL/2 face. Mirrored along #1: pz = DH/2 - op.x. Y=0 bottom.
+    const pz=EL.DH/2-op.x, py=op.y-EL.DS/2;
+    cyl.rotation.set(0,0,PI/2);cyl.position.set(-EL.DL/2+dep/2,py,pz);
+    mkr.rotation.set(0,0,PI/2);mkr.position.set(-EL.DL/2-2,py,pz);
+  }
+  bGroup.add(cyl,mkr);markers.push({cyl,torus:cyl,mkr,op});
+}
+
+function bldSaw(op){
+  const dep=Math.abs(op.z),w=op.width||3.6,len=Math.max(10,EL.DL-40);
+  const geo=new THREE.BoxGeometry(len,Math.max(1,dep+.5),Math.max(1,w));
+  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:oph('blade'),roughness:.8,emissive:oph('blade'),emissiveIntensity:.12}));
+  const pzSaw=EL.DH/2-op.y;
+  mesh.position.set(0,EL.DS/2-dep/2,pzSaw);
+  const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:oph('blade')}));
+  edges.position.copy(mesh.position);
+  const mkr=new THREE.Mesh(new THREE.BoxGeometry(len,4,w+2),new THREE.MeshBasicMaterial({visible:false}));
+  mkr.position.set(0,EL.DS/2+1.2,pzSaw);mkr.userData={op};
+  bGroup.add(mesh,edges,mkr);markers.push({cyl:mesh,torus:edges,mkr,op});
+}
+
+function bldBlade(op){
+  const dep=Math.abs(op.z),w=op.width||4;
+  const x1=op.x, y1=op.y;
+  const x2=op.orient==='y'?op.x2||op.x:op.x2||EL.DL;
+  const y2=op.orient==='y'?op.y2||op.y:op.y;
+  const lenX=Math.abs(x2-x1), lenY=Math.abs(y2-y1);
+  const cx=(x1+x2)/2-EL.DL/2, cy=EL.DH/2-(y1+y2)/2;
+  const geo=op.orient==='y'
+    ? new THREE.BoxGeometry(w,dep+.5,Math.max(lenY,5))
+    : new THREE.BoxGeometry(Math.max(lenX,5),dep+.5,w);
+  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:oph('blade'),roughness:.8,emissive:oph('blade'),emissiveIntensity:.12}));
+  mesh.position.set(cx,EL.DS/2-dep/2,cy);
+  const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:oph('blade')}));
+  edges.position.copy(mesh.position);
+  const mkr=new THREE.Mesh(op.orient==='y'
+    ? new THREE.BoxGeometry(w+4,6,Math.max(lenY,5)+4)
+    : new THREE.BoxGeometry(Math.max(lenX,5)+4,6,w+4),
+    new THREE.MeshBasicMaterial({visible:false}));
+  mkr.position.copy(mesh.position);mkr.userData={op};
+  bGroup.add(mesh,edges,mkr);markers.push({cyl:mesh,torus:edges,mkr,op});
+}
+
+/* Build 3D mill: rounded slot = boxes per segment + cylinder caps at vertices.
+   Each segment → BoxGeometry aligned along segment direction AND into surface.
+   Each vertex → CylinderGeometry cap (fills rounded corners).
+   If tool dia unknown → just draw centre line. */
+function bldMill(op){
+  if(!op.pts||op.pts.length<2)return;
+  const col=oph('mill');
+
+  // Outward face normals
+  const FN={TOP:new THREE.Vector3(0,1,0),FRONT:new THREE.Vector3(0,0,1),
+    BACK:new THREE.Vector3(0,0,-1),RIGHT:new THREE.Vector3(1,0,0),LEFT:new THREE.Vector3(-1,0,0)};
+  const fn=FN[op.side]||FN.TOP;
+
+  // Surface points (exactly on material face)
+  let pts3;
+  if(op.side==='TOP'){
+    pts3=op.pts.map(p=>new THREE.Vector3(p.x-EL.DL/2,  EL.DS/2+1,    EL.DH/2-p.y));
+  } else if(op.side==='FRONT'){
+    pts3=op.pts.map(p=>new THREE.Vector3(p.x-EL.DL/2,  p.y-EL.DS/2,  EL.DH/2+1));
+  } else if(op.side==='BACK'){
+    pts3=op.pts.map(p=>new THREE.Vector3(p.x-EL.DL/2,  p.y-EL.DS/2, -EL.DH/2-1));
+  } else if(op.side==='RIGHT'){
+    pts3=op.pts.map(p=>new THREE.Vector3( EL.DL/2+1,   p.y-EL.DS/2,  EL.DH/2-p.x));
+  } else if(op.side==='LEFT'){
+    pts3=op.pts.map(p=>new THREE.Vector3(-EL.DL/2-1,   p.y-EL.DS/2,  EL.DH/2-p.x));
+  } else {
+    pts3=op.pts.map(p=>new THREE.Vector3(p.x-EL.DL/2,  EL.DS/2+1,    EL.DH/2-p.y));
+  }
+
+  const millDia=getMillDia(op.toolNum||1200);
+  const depth=Math.abs(op.z)||10;
+  const R=millDia>0?millDia/2:0;
+  const slotGroup=new THREE.Group();
+
+  if(R>0){
+    const slotMat=new THREE.MeshStandardMaterial({
+      color:col,roughness:.45,emissive:col,emissiveIntensity:.1,
+      transparent:true,opacity:.80
+    });
+    const depthDir=fn.clone().negate(); // into material
+
+    for(let i=0;i<pts3.length-1;i++){
+      const a=pts3[i],b=pts3[i+1];
+      const seg=new THREE.Vector3().subVectors(b,a);
+      const segLen=seg.length(); if(segLen<0.01)continue;
+      const segDir=seg.clone().normalize();
+      // width dir = perpendicular to both segDir and depthDir
+      const widthDir=new THREE.Vector3().crossVectors(segDir,depthDir).normalize();
+      if(widthDir.lengthSq()<0.01){
+        // seg is parallel to depthDir – use fallback width
+        widthDir.set(1,0,0).sub(segDir.clone().multiplyScalar(segDir.x)).normalize();
+      }
+
+      // Box: X=along segment, Y=into material, Z=slot width
+      const m4=new THREE.Matrix4().makeBasis(segDir,depthDir,widthDir);
+      const q=new THREE.Quaternion().setFromRotationMatrix(m4);
+      const box=new THREE.Mesh(new THREE.BoxGeometry(segLen,depth,millDia),slotMat);
+      const midPt=new THREE.Vector3().addVectors(a,b).multiplyScalar(.5)
+                   .addScaledVector(depthDir,depth/2);
+      box.position.copy(midPt); box.quaternion.copy(q);
+      slotGroup.add(box);
+    }
+
+    // Cylinder caps at each vertex (fills rounded corners and end-caps)
+    const capQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),depthDir);
+    pts3.forEach(p=>{
+      const cap=new THREE.Mesh(new THREE.CylinderGeometry(R,R,depth,16),slotMat);
+      cap.position.copy(p.clone().addScaledVector(depthDir,depth/2));
+      cap.quaternion.copy(capQ);
+      slotGroup.add(cap);
+    });
+    bGroup.add(slotGroup);
+  }
+
+  // Centre line (always visible)
+  const lineGeo=new THREE.BufferGeometry().setFromPoints(pts3);
+  const line=new THREE.Line(lineGeo,new THREE.LineBasicMaterial({color:col}));
+  bGroup.add(line);
+
+  // Raycasting: invisible boxes along each segment (much larger hit area than centroid)
+  const invMat=new THREE.MeshBasicMaterial({visible:false});
+  const hitBoxes=[];
+  for(let i=0;i<pts3.length-1;i++){
+    const a=pts3[i],b=pts3[i+1];
+    const seg=new THREE.Vector3().subVectors(b,a);
+    const sLen=seg.length();if(sLen<0.01)continue;
+    const sDir=seg.clone().normalize();
+    const hitW=Math.max(20,millDia>0?millDia+8:20); // wide enough to click easily
+    const hitH=Math.max(20,depth+8);
+    const hitBox=new THREE.Mesh(new THREE.BoxGeometry(sLen,hitH,hitW),invMat);
+    const mid=new THREE.Vector3().addVectors(a,b).multiplyScalar(.5)
+               .addScaledVector(fn.clone().negate(),depth/2);
+    hitBox.position.copy(mid);
+    // Align long axis to segment direction
+    hitBox.quaternion.setFromUnitVectors(new THREE.Vector3(1,0,0),sDir);
+    hitBox.userData={op};
+    bGroup.add(hitBox);
+    hitBoxes.push(hitBox);
+  }
+  // Also add cap hitbox at first and last pt
+  const mkr=hitBoxes[0]||new THREE.Mesh(new THREE.BoxGeometry(20,20,20),invMat);
+  if(!hitBoxes.length){mkr.position.copy(pts3[0]);mkr.userData={op};bGroup.add(mkr);}
+  // Register all hit boxes in markers pointing to first one as canonical mkr
+  hitBoxes.forEach(hb=>{if(hb!==mkr)markers.push({cyl:line,torus:slotGroup.children.length?slotGroup:line,mkr:hb,op});});
+  bGroup.add(mkr);
+  markers.push({cyl:line,torus:slotGroup.children.length?slotGroup:line,mkr,op});
+}
+
+function applySel(){
+  markers.forEach(({cyl,torus,op})=>{
+    const s=selWs===op.ws;
+    if(op.type==='drill'){
+      const through=isDrillThrough(op);
+      const baseCol=oph(through?'through':'drill');
+      const selCol=oph('sel');
+      cyl.material=new THREE.MeshStandardMaterial({
+        color:s?selCol:baseCol,roughness:.6,
+        emissive:s?selCol:baseCol,emissiveIntensity:s?.4:.15
+      });
+    } else if(op.type==='saw'||op.type==='blade'){
+      const c=s?oph('sel'):oph('blade');
+      cyl.material=new THREE.MeshStandardMaterial({color:c,roughness:.8,emissive:c,emissiveIntensity:s?.35:.12});
+      if(torus.material?.color)torus.material.color.set(c);
+    } else if(op.type==='mill'){
+      const c=s?oph('sel'):oph('mill');
+      if(cyl.material?.color)cyl.material.color.set(c);
+      if(torus&&torus.children){
+        torus.children.forEach(ch=>{if(ch.material?.color)ch.material.color.set(c);});
+      }
+    }
+  });
+}
+
+const RC=new THREE.Raycaster(),M2=new THREE.Vector2();
+function onC3Click(e){
+  if(curView!=='3d'||!LOADED)return;
+  const r=c3d.getBoundingClientRect();
+  M2.x=((e.clientX-r.left)/r.width)*2-1;M2.y=-((e.clientY-r.top)/r.height)*2+1;
+  RC.setFromCamera(M2,cam);
+  const h=RC.intersectObjects(markers.map(m=>m.mkr),false);
+  if(h.length)selectOp(h[0].object.userData.op.ws,true);
+}
+function animate(){requestAnimationFrame(animate);if(controls)controls.update();if(ren&&scene&&cam)ren.render(scene,cam);}
+
+/* ─── VIEWS ──────────────────────────────────────────────────────── */
+function switchView(v){
+  curView=v;
+  IDB.set('lastView',v).catch(()=>{});
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('act'));
+  document.getElementById('tab-'+v).classList.add('act');
+  const hint=document.getElementById('hint'),dimbar=document.getElementById('dimbar');
+  if(v==='3d'){
+    c3d.style.display='block';c2d.style.display='none';
+    dimbar.style.display='none';
+    document.getElementById('xray-bar').style.display='block';
+    hint.textContent='Lewy: obrót · Prawy: przesuw · Scroll: zoom';
+  } else {
+    c3d.style.display='none';c2d.style.display='block';dimbar.style.display='block';
+    document.getElementById('xray-bar').style.display='none';
+    hint.textContent='Widok '+{
+      '2d':'TOP','front':'FRONT','back':'BACK','right':'RIGHT','left':'LEFT'
+    }[v]+' · kliknij aby zaznaczyć';
+    draw2D();
+  }
+}
+function toggleDims(){showDims=!showDims;document.getElementById('btn-dims').classList.toggle('on',showDims);draw2D();}
+function filterSide(s){
+  curFilter=s;
+  document.querySelectorAll('.stab').forEach((el,i)=>el.classList.toggle('act',['ALL','TOP','FRONT','RIGHT','BACK','LEFT'][i]===s));
+  renderOps();
+}
+
+/* ─── ADD FORM ───────────────────────────────────────────────────── */
+function openAddForm(type){
+  addingType=type;millPts=[];
+  document.getElementById('add-title').textContent={drill:'Nowy nawiert',blade:'Nowa piłka (W#1050)',mill:'Nowe frezowanie'}[type];
+  const f=document.getElementById('add-fields');
+  f.innerHTML='';
+  if(type==='drill'){
+    f.innerHTML=`
+<div><label>Ściana</label><select id="af-side">${SIDES.map(s=>`<option>${s}</option>`).join('')}</select></div>
+<div><label>Średnica (mm)</label><input id="af-dia" type="number" value="8" step="0.5" min="0.5"></div>
+<div><label>X (mm)</label><input id="af-x" type="number" value="50" step="0.1"></div>
+<div><label>Y (mm)</label><input id="af-y" type="number" value="50" step="0.1"></div>
+<div><label>Głębokość (mm)</label><input id="af-z" type="number" value="10" step="0.5" min="0.1"></div>`;
+  } else if(type==='blade'){
+    f.innerHTML=`
+<div><label>Ściana</label><select id="af-side">${SIDES.map(s=>`<option>${s}</option>`).join('')}</select></div>
+<div><label>Narzędzie #8516</label><input id="af-tool" type="number" value="1151" step="1"></div>
+<div><label>X start (mm)</label><input id="af-x" type="number" value="0" step="0.1"></div>
+<div><label>Y = const (mm)</label><input id="af-y" type="number" value="100" step="0.1"></div>
+<div><label>X koniec (mm)</label><input id="af-x2" type="number" value="540" step="0.1"></div>
+<div><label>Głębokość (mm)</label><input id="af-z" type="number" value="13" step="0.5" min="0.1"></div>
+<div><label>Szerokość rowka (mm)</label><input id="af-w" type="number" value="4" step="0.5" min="0.1"></div>`;
+  } else if(type==='mill'){
+    f.innerHTML=`
+<div><label>Ściana</label><select id="af-side">${SIDES.map(s=>`<option>${s}</option>`).join('')}</select></div>
+<div><label>Narzędzie #205</label><input id="af-tool" type="number" value="1200" step="1"></div>
+<div><label>Głębokość (mm)</label><input id="af-z" type="number" value="10" step="0.5" min="0.1"></div>
+<div class="full">
+  <label>Wierzchołki (kliknij "+" by dodać)</label>
+  <div class="pts-list" id="af-pts"></div>
+  <div style="display:flex;gap:var(--s2)">
+    <input id="af-px" type="number" value="100" step="0.1" placeholder="X" style="flex:1;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px var(--s2);font-size:var(--tsm);color:var(--txt)">
+    <input id="af-py" type="number" value="100" step="0.1" placeholder="Y" style="flex:1;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px var(--s2);font-size:var(--tsm);color:var(--txt)">
+    <button class="btn btn-sec" onclick="addMillPt()" style="padding:4px 8px;font-size:var(--txs)">+</button>
+  </div>
+</div>`;
+    renderMillPts();
+  }
+  document.getElementById('add-form').classList.remove('hidden');
+}
+const SIDES=['TOP','FRONT','BACK','RIGHT','LEFT'];
+function closeAddForm(){document.getElementById('add-form').classList.add('hidden');addingType=null;millPts=[];}
+
+function addMillPt(){
+  const x=parseFloat(document.getElementById('af-px').value);
+  const y=parseFloat(document.getElementById('af-py').value);
+  if(!isNaN(x)&&!isNaN(y)){
+    millPts.push({x,y});
+    renderMillPts();
+    // Live preview: temporarily show polyline on canvas if >=2 pts
+    if(millPts.length>=2) brPreviewMill();
+  }
+}
+
+function brPreviewMill(){
+  // Create a temporary op and rebuild scene for live feedback
+  const side=document.getElementById('af-side')?.value||'TOP';
+  const z=parseFloat(document.getElementById('af-z')?.value)||10;
+  const toolNum=parseInt(document.getElementById('af-tool')?.value)||1200;
+  // Temporarily push, rebuild, then remove
+  const tmpWs=nextWs+9999;
+  OPS.push({ws:tmpWs,side,type:'mill',x:millPts[0].x,y:millPts[0].y,z:-Math.abs(z),toolNum,pts:[...millPts],_tmp:true});
+  buildScene();if(curView!=='3d')draw2D();
+  OPS=OPS.filter(o=>!o._tmp);
+}
+function removeMillPt(i){millPts.splice(i,1);renderMillPts();}
+function renderMillPts(){
+  const el=document.getElementById('af-pts');
+  if(!el)return;
+  el.innerHTML=millPts.map((p,i)=>`<div class="pt-row">
+    <span style="color:var(--faint);width:16px">${i+1}.</span>
+    X<input value="${p.x}" step="0.1" type="number" onchange="millPts[${i}].x=parseFloat(this.value)" style="width:60px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+    Y<input value="${p.y}" step="0.1" type="number" onchange="millPts[${i}].y=parseFloat(this.value)" style="width:60px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+    <button class="pt-del" onclick="removeMillPt(${i})">✕</button>
+  </div>`).join('');
+}
+
+function commitAdd(){
+  const side=(document.getElementById('af-side')?.value)||'TOP';
+  if(addingType==='drill'){
+    const dia=parseFloat(document.getElementById('af-dia').value)||8;
+    const x=parseFloat(document.getElementById('af-x').value)||50;
+    const y=parseFloat(document.getElementById('af-y').value)||50;
+    const z=parseFloat(document.getElementById('af-z').value)||10;
+    OPS.push({ws:nextWs++,side,type:'drill',x,y,z:-Math.abs(z),dia});
+  } else if(addingType==='blade'){
+    const x=parseFloat(document.getElementById('af-x').value)||0;
+    const y=parseFloat(document.getElementById('af-y').value)||100;
+    const x2=parseFloat(document.getElementById('af-x2').value)||EL.DL;
+    const z=parseFloat(document.getElementById('af-z').value)||13;
+    const w=parseFloat(document.getElementById('af-w').value)||4;
+    const tool=(parseInt(document.getElementById('af-tool').value)||1151);
+    OPS.push({ws:nextWs++,side,type:'blade',x,y,x2,y2:y,orient:'x',z:-Math.abs(z),width:w,toolNum:tool});
+  } else if(addingType==='mill'){
+    if(millPts.length<2){showToast('Dodaj minimum 2 wierzchołki',true);return;}
+    const z=parseFloat(document.getElementById('af-z').value)||10;
+    const tool=(parseInt(document.getElementById('af-tool').value)||1200);
+    OPS.push({ws:nextWs++,side,type:'mill',
+      x:millPts[0].x,y:millPts[0].y,z:-Math.abs(z),toolNum:tool,pts:[...millPts]});
+  }
+  closeAddForm();renderOps();buildScene();if(curView!=='3d')draw2D();showToast('✓ Dodano operację');
+}
+
+function deleteOp(ws){
+  OPS=OPS.filter(o=>o.ws!==ws);if(selWs===ws)selWs=null;
+  renderOps();buildScene();if(curView!=='3d')draw2D();showToast('Usunięto operację');
+}
+
+/* ─── SIDEBAR LIST ───────────────────────────────────────────────── */
+function renderOps(){
+  const cont=document.getElementById('ops-list');
+  const fil=curFilter==='ALL'?OPS:OPS.filter(o=>o.side===curFilter);
+  const lbl={TOP:'Góra (TOP)',FRONT:'Przód (FRONT)',RIGHT:'Prawa (RIGHT)',BACK:'Tył (BACK)',LEFT:'Lewa (LEFT)'};
+  const gs={};fil.forEach(o=>{if(!gs[o.side])gs[o.side]=[];gs[o.side].push(o);});
+  cont.innerHTML='';
+  for(const side in gs){
+    const g=document.createElement('div');g.className='og';
+    g.innerHTML=`<div class="ogt">${lbl[side]||side}</div>`;
+    gs[side].forEach(op=>{
+      const it=document.createElement('div');
+      it.className='oi'+(selWs===op.ws?' sel':'');it.dataset.ws=op.ws;
+      let badge='',fields='';
+      if(op.type==='drill'){
+        badge=`Nawiert ⌀${fv(op.dia)}mm`;
+        fields=`
+<div><span class="ol">X (mm)</span><input class="oi-in" type="number" value="${fv(op.x)}" step="0.1" onchange="updOp(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fv(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Średnica (mm)</span><input class="oi-in" type="number" value="${fv(op.dia)}" step="0.5" onchange="updOp(${op.ws},'dia',this.value)" onclick="event.stopPropagation()"></div>`;
+      } else if(op.type==='saw'){
+        badge='Piła (saw)';
+        fields=`
+<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fv(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Szerokość (mm)</span><input class="oi-in" type="number" value="${fv(op.width||3.6)}" step="0.1" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>`;
+      } else if(op.type==='blade'){
+        badge=`Piłka W#1050 (${op.orient==='y'?'⇕':'⇔'})`;
+        if(op.orient==='x'){
+          // X-cut: horizontal line at constant Y
+          fields=`
+<div><span class="ol">X start</span><input class="oi-in" type="number" value="${fv(op.x)}" step="0.1" onchange="updBlade(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">X koniec</span><input class="oi-in" type="number" value="${fv(op.x2??EL.DL)}" step="0.1" onchange="updBlade(${op.ws},'x2',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y = const</span><input class="oi-in" type="number" value="${fv(op.y)}" step="0.1" onchange="updBlade(${op.ws},'yconst',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Szerokość rowka</span><input class="oi-in" type="number" value="${fv(op.width||4)}" step="0.5" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Narzędzie #8516</span><input class="oi-in" type="number" value="${op.toolNum||1151}" step="1" onchange="updOp(${op.ws},'toolNum',this.value)" onclick="event.stopPropagation()"></div>`;
+        } else {
+          // Y-cut: vertical line at constant X
+          fields=`
+<div><span class="ol">X = const</span><input class="oi-in" type="number" value="${fv(op.x)}" step="0.1" onchange="updBlade(${op.ws},'xconst',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y start</span><input class="oi-in" type="number" value="${fv(op.y)}" step="0.1" onchange="updBlade(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y koniec</span><input class="oi-in" type="number" value="${fv(op.y2??0)}" step="0.1" onchange="updBlade(${op.ws},'y2',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Szerokość rowka</span><input class="oi-in" type="number" value="${fv(op.width||4)}" step="0.5" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Narzędzie #8516</span><input class="oi-in" type="number" value="${op.toolNum||1151}" step="1" onchange="updOp(${op.ws},'toolNum',this.value)" onclick="event.stopPropagation()"></div>`;
+        }
+      } else if(op.type==='mill'){
+        badge=`Frezowanie (${op.pts?.length||0} pkt)`;
+        const ptsHtml=(op.pts||[]).map((p,i)=>`<div class="pt-row" style="font-size:var(--txs)">
+          <span style="color:var(--faint);min-width:16px">${i+1}.</span>
+          X<input value="${fv(p.x)}" type="number" step="0.1" onchange="updMillPt(${op.ws},${i},'x',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+          Y<input value="${fv(p.y)}" type="number" step="0.1" onchange="updMillPt(${op.ws},${i},'y',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+          <button class="pt-del" onclick="event.stopPropagation();delMillPt(${op.ws},${i})">✕</button>
+        </div>`).join('');
+        fields=`
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fv(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Narzędzie #205</span><input class="oi-in" type="number" value="${op.toolNum||1200}" step="1" onchange="updOp(${op.ws},'toolNum',this.value)" onclick="event.stopPropagation()"></div>
+<div style="grid-column:1/-1">
+  <span class="ol">Wierzchołki</span>
+  <div class="pts-list">${ptsHtml}</div>
+  <div style="display:flex;gap:3px;margin-top:4px;width:100%;box-sizing:border-box">
+    <span style="font-size:10px;color:var(--faint);padding-top:5px;white-space:nowrap">X</span>
+    <input id="mpt-x-${op.ws}" type="number" value="100" step="0.1" placeholder="X" onclick="event.stopPropagation()" style="min-width:0;flex:1;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:3px 3px;font-size:10px;color:var(--txt)">
+    <span style="font-size:10px;color:var(--faint);padding-top:5px;white-space:nowrap">Y</span>
+    <input id="mpt-y-${op.ws}" type="number" value="100" step="0.1" placeholder="Y" onclick="event.stopPropagation()" style="min-width:0;flex:1;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:3px 3px;font-size:10px;color:var(--txt)">
+    <button onclick="event.stopPropagation();addMillPtToOp(${op.ws})" style="flex-shrink:0;padding:3px 7px;font-size:11px;font-weight:700;background:var(--pri);color:#fff;border:none;border-radius:var(--rsm);cursor:pointer">+</button>
+  </div>
+</div>`;
+      }
+      it.innerHTML=`<div class="oih">
+  <span class="oid">WS=${op.ws}</span>
+  <div style="display:flex;gap:var(--s1);align-items:center">
+    <span class="otb ${op.type}">${badge}</span>
+    <button class="btn-del" onclick="event.stopPropagation();deleteOp(${op.ws})" title="Usuń">✕</button>
+  </div>
+</div><div class="ofl">${fields}</div>`;
+      it.addEventListener('click',e=>{if(['INPUT','BUTTON','SELECT'].includes(e.target.tagName))return;selectOp(op.ws,false);});
+      g.appendChild(it);
+    });
+    cont.appendChild(g);
+  }
+  document.getElementById('cnt-lbl').textContent=`${OPS.length} operacji`;
+  updateRotBtnWarning();
+}
+
+function updMillPt(ws,i,field,val){
+  const op=OPS.find(o=>o.ws===ws);if(!op||!op.pts||!op.pts[i])return;
+  op.pts[i][field]=parseFloat(val)||0;
+  if(i===0){op.x=op.pts[0].x;op.y=op.pts[0].y;}
+  buildScene();if(curView!=='3d')draw2D();
+}
+function delMillPt(ws,i){
+  const op=OPS.find(o=>o.ws===ws);if(!op||!op.pts)return;
+  op.pts.splice(i,1);
+  if(op.pts.length>0){op.x=op.pts[0].x;op.y=op.pts[0].y;}
+  _refreshMillPtsList(ws);
+  buildScene();if(curView!=='3d')draw2D();
+}
+function addMillPtToOp(ws){
+  const op=OPS.find(o=>o.ws===ws);if(!op)return;
+  const xi=document.getElementById('mpt-x-'+ws);
+  const yi=document.getElementById('mpt-y-'+ws);
+  const x=parseFloat(xi?.value)||0;
+  const y=parseFloat(yi?.value)||0;
+  if(!op.pts)op.pts=[];
+  op.pts.push({x,y});
+  // Reset inputs to allow next point entry
+  if(xi)xi.value=x;
+  if(yi)yi.value=y;
+  _refreshMillPtsList(ws);
+  buildScene();if(curView!=='3d')draw2D();
+}
+/* Refresh only the pts-list div of one mill op without rebuilding the whole sidebar */
+function _refreshMillPtsList(ws){
+  const op=OPS.find(o=>o.ws===ws);if(!op||!op.pts)return;
+  const container=document.querySelector(`.oi[data-ws="${ws}"] .pts-list`);
+  if(!container)return;
+  container.innerHTML=op.pts.map((p,i)=>`<div class="pt-row" style="font-size:var(--txs)">
+    <span style="color:var(--faint);min-width:16px">${i+1}.</span>
+    X<input value="${fv(p.x)}" type="number" step="0.1" onchange="updMillPt(${ws},${i},'x',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+    Y<input value="${fv(p.y)}" type="number" step="0.1" onchange="updMillPt(${ws},${i},'y',this.value)" onclick="event.stopPropagation()" style="width:58px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px 4px;font-size:var(--txs);text-align:right;color:var(--txt)">
+    <button class="pt-del" onclick="event.stopPropagation();delMillPt(${ws},${i})">✕</button>
+  </div>`).join('');
+  // Update badge count
+  const badge=document.querySelector(`.oi[data-ws="${ws}"] .otb.mill`);
+  if(badge)badge.textContent=`Frezowanie (${op.pts.length} pkt)`;
+}
+
+function selectOp(ws,scrollSb=false){
+  selWs=ws;applySel();
+  document.querySelectorAll('.oi').forEach(el=>el.classList.toggle('sel',+el.dataset.ws===ws));
+  if(scrollSb)setTimeout(()=>{const el=document.querySelector(`.oi[data-ws="${ws}"]`);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);
+  if(curView!=='3d')draw2D();
+}
+
+function updBlade(ws,field,val){
+  const op=OPS.find(o=>o.ws===ws);if(!op||op.type!=='blade')return;
+  const v=parseFloat(val);if(isNaN(v))return;
+  if(field==='yconst'){op.y=v;op.y2=v;}         // X-cut: constant Y
+  else if(field==='xconst'){op.x=v;op.x2=v;}    // Y-cut: constant X
+  else op[field]=v;
+  renderOps();buildScene();if(curView!=='3d')draw2D();
+}
+
+function updOp(ws,field,val){
+  const op=OPS.find(o=>o.ws===ws);if(!op)return;
+  const v=parseFloat(val);if(isNaN(v))return;
+  if(field==='z')op.z=-Math.abs(v);
+  else if(field==='y'&&op.type==='blade'){op.y=v;op.y2=v;}
+  else if(field==='toolNum')op.toolNum=parseInt(val)||op.toolNum;
+  else op[field]=v;
+  renderOps();buildScene();if(curView!=='3d')draw2D();
+}
+
+function updateRotBtnWarning(){
+  const hasBlade=OPS.some(o=>o.type==='blade'||o.type==='saw');
+  const w=document.getElementById('rotBtn-warn');
+  if(w)w.style.display=hasBlade?'inline':'none';
+}
+
+function changeLabelFont(delta){
+  labelFontSize=Math.max(7,Math.min(22,labelFontSize+delta));
+  IDB.set('labelFontSize',labelFontSize).catch(()=>{});
+  // Update fb-name sizes live
+  document.querySelectorAll('.fb-name').forEach(el=>el.style.fontSize=labelFontSize+'px');
+  // Redraw 2D if visible
+  if(curView!=='3d')draw2D();
+}
+
+function updateEL(){
+  EL.DL=parseFloat(document.getElementById('ed-dl').value)||0;
+  EL.DH=parseFloat(document.getElementById('ed-dh').value)||0;
+  EL.DS=parseFloat(document.getElementById('ed-ds').value)||0;
+  document.getElementById('dim-lbl').textContent=LOADED?`${EL.DL} × ${EL.DH} × ${EL.DS} mm`:'Brak pliku';
+  buildScene();if(curView!=='3d')draw2D();
+}
+
+/* ─── 2D VIEW ─────────────────────────────────────────────────────── */
+// Tab 'front' displays BACK data and vice versa (physical orientation convention)
+function getVC(){
+  const m={
+    '2d':   {w:EL.DL,h:EL.DH,label:'GÓRA (TOP)',   side:'TOP'},
+    'front':{w:EL.DL,h:EL.DS,label:'PRZÓD (FRONT)', side:'FRONT'},
+    'back': {w:EL.DL,h:EL.DS,label:'TYŁ (BACK)',    side:'BACK'},
+    'right':{w:EL.DH,h:EL.DS,label:'PRAWA (RIGHT)', side:'RIGHT'},
+    'left': {w:EL.DH,h:EL.DS,label:'LEWA (LEFT)',   side:'LEFT'}};
+  return m[curView]||m['2d'];
+}
+
+/* Point-to-segment distance helper for 2D click tests */
+function distPtSeg(px,py,ax,ay,bx,by){
+  const dx=bx-ax,dy=by-ay;
+  const lenSq=dx*dx+dy*dy;
+  if(lenSq<0.001)return Math.hypot(px-ax,py-ay);
+  const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/lenSq));
+  return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));
+}
+
+function draw2D(){
+  const va=document.getElementById('va'),W=va.clientWidth,H=va.clientHeight;
+  c2d.width=W;c2d.height=H;const d=dk();
+  ctx.clearRect(0,0,W,H);ctx.fillStyle=d?'#171614':'#f7f6f2';ctx.fillRect(0,0,W,H);
+  if(!LOADED){ctx.fillStyle=d?'#797876':'#7a7974';ctx.font='16px Satoshi,sans-serif';ctx.textAlign='center';ctx.fillText('Wczytaj plik TCN',W/2,H/2);c2d.onclick=null;return;}
+  const cfg=getVC();
+  const sOps=OPS.filter(o=>o.side===cfg.side);
+  const drills=sOps.filter(o=>o.type==='drill');
+
+  // dimStep must be wide enough to fit the rotated label text (labelFontSize = text width when rotated 90°)
+  const dimStep=Math.max(22, labelFontSize+8), dimInit=40;
+  const uXc=showDims&&drills.length?new Set(drills.map(o=>o.x)).size:0;
+  const uYc=showDims&&drills.length?new Set(drills.map(o=>o.y)).size:0;
+  const padL=80,padT=55;
+  const padR=70+(uYc>0?dimInit+20+(uYc-1)*dimStep+20:0);
+  const padB=78+(uXc>0?dimInit+20+(uXc-1)*dimStep+16:0);
+
+  const sc=Math.min((W-padL-padR)/Math.max(1,cfg.w),(H-padT-padB)/Math.max(1,cfg.h));
+  const ox=(W-padL-padR-cfg.w*sc)/2+padL,oy=(H-padT-padB-cfg.h*sc)/2+padT;
+  // Y-flip: Y=0 at bottom-left; ty(0)=canvas bottom, ty(cfg.h)=canvas top
+  const tx=x=>ox+x*sc;
+  const ty=y=>oy+(cfg.h-y)*sc;
+
+  // Board: ty(cfg.h) is canvas-top, ty(0) is canvas-bottom
+  ctx.fillStyle=d?'#5a3010':'#c8a060';
+  ctx.fillRect(tx(0),ty(cfg.h),cfg.w*sc,cfg.h*sc);
+  ctx.strokeStyle=d?'#4f98a3':'#01696f';ctx.lineWidth=2;
+  ctx.strokeRect(tx(0),ty(cfg.h),cfg.w*sc,cfg.h*sc);
+  ctx.fillStyle=d?'#797876':'#7a7974';ctx.font='bold 12px Satoshi,sans-serif';ctx.textAlign='left';
+  ctx.fillText(cfg.label,tx(0),ty(cfg.h)-10);
+
+  if(showDims){
+    const mc=d?'#4f98a3':'#01696f',mt=d?'#cdccca':'#28251d';
+    // Main H-dim below board (below ty(0) = canvas bottom of board)
+    drawDimH(tx(0),tx(cfg.w),ty(0)+22,`${cfg.w} mm`,mc,mt);
+    // Main V-dim right of board (from ty(cfg.h)=top to ty(0)=bottom)
+    drawDimV(tx(cfg.w)+22,ty(cfg.h),ty(0),`${cfg.h} mm`,mc,mt);
+  }
+
+  sOps.forEach(op=>{
+    const sel=selWs===op.ws;
+    if(op.type==='drill'){
+      const through=isDrillThrough(op);
+      const cx=tx(op.x),cy=ty(op.y),r=Math.max(2,(op.dia/2)*sc);
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+      const dkey=through?'through':'drill';
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.fillStyle=sel?opc('sel')+'99':opc(dkey)+'bb';
+      ctx.fill();
+      ctx.lineWidth=sel?2.3:1.8;
+      ctx.strokeStyle=sel?opc('sel'):opc(dkey);
+      ctx.stroke();
+      ctx.save();ctx.strokeStyle=(sel?opc('sel'):opc(dkey))+'66';ctx.lineWidth=.7;ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.moveTo(cx-r*1.5,cy);ctx.lineTo(cx+r*1.5,cy);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx,cy-r*1.5);ctx.lineTo(cx,cy+r*1.5);ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle=sel?opc('sel'):opc(dkey);ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
+      ctx.fillText(`⌀${fv(op.dia)} ↓${fv(Math.abs(op.z))}${through?' ⇣':''}`,cx,cy+r+labelFontSize+2);
+
+    } else if(op.type==='saw'&&curView==='2d'){
+      const lx=tx(20),ly=ty(op.y),lw=(cfg.w-40)*sc,lh=Math.max(2,-(op.width||3.6)*sc);
+      ctx.fillStyle=(sel?opc('sel'):opc('blade'))+'44';
+      ctx.strokeStyle=sel?opc('sel'):opc('blade');ctx.lineWidth=sel?2:1.5;
+      ctx.fillRect(lx,ly,lw,lh);ctx.strokeRect(lx,ly,lw,lh);
+
+    } else if(op.type==='blade'){
+      const x1c=tx(op.x),y1c=ty(op.y);
+      const x2c=op.orient==='y'?tx(op.x):tx(op.x2??cfg.w);
+      const y2c=op.orient==='y'?ty(op.y2??0):ty(op.y);
+      const hw=Math.max(1.5,(op.width||4)*sc/2);
+      const bc=sel?opc('sel'):opc('blade');
+      ctx.save();
+      ctx.strokeStyle=bc;
+      ctx.lineWidth=hw*2;ctx.globalAlpha=.45;
+      ctx.beginPath();ctx.moveTo(x1c,y1c);ctx.lineTo(x2c,y2c);ctx.stroke();
+      ctx.globalAlpha=1;ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(x1c,y1c);ctx.lineTo(x2c,y2c);ctx.stroke();
+      ctx.fillStyle=bc;ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
+      ctx.fillText(`piłka w=${fv(op.width)} ↓${fv(Math.abs(op.z))}`,(x1c+x2c)/2,Math.min(y1c,y2c)-6);
+      ctx.restore();
+
+    } else if(op.type==='mill'&&op.pts?.length>=2){
+      const millDia=getMillDia(op.toolNum||1200);
+      const mc=sel?opc('sel'):opc('mill');
+      ctx.save();
+      if(millDia>0){
+        ctx.lineWidth=Math.max(2,(millDia/2)*sc*2);
+        ctx.strokeStyle=mc+'44';
+        ctx.lineCap='round';ctx.lineJoin='round';
+        ctx.beginPath();
+        op.pts.forEach((p,i)=>i===0?ctx.moveTo(tx(p.x),ty(p.y)):ctx.lineTo(tx(p.x),ty(p.y)));
+        ctx.stroke();
+      }
+      ctx.strokeStyle=mc;ctx.lineWidth=sel?2:1.5;
+      ctx.lineCap='round';ctx.lineJoin='round';
+      ctx.beginPath();
+      op.pts.forEach((p,i)=>i===0?ctx.moveTo(tx(p.x),ty(p.y)):ctx.lineTo(tx(p.x),ty(p.y)));
+      ctx.stroke();
+      ctx.fillStyle=mc;
+      op.pts.forEach(p=>{ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),3,0,Math.PI*2);ctx.fill();});
+      const cxm=op.pts.reduce((a,p)=>a+p.x,0)/op.pts.length;
+      const cym=op.pts.reduce((a,p)=>a+p.y,0)/op.pts.length;
+      ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
+      ctx.fillText(`frez #${op.toolNum||1200}${millDia?` ⌀${fv(millDia)}`:''} ↓${fv(Math.abs(op.z))}`,tx(cxm),ty(cym)-9);
+      ctx.restore();
+    }
+  });
+
+  if(showDims&&drills.length)drawHoleDims(cfg,drills,tx,ty,d,dimInit,dimStep);
+
+  c2d.onclick=e=>{
+    const rc=c2d.getBoundingClientRect(),mx=e.clientX-rc.left,my=e.clientY-rc.top;
+    let hit=null;
+    sOps.forEach(op=>{
+      if(op.type==='drill'){
+        const cx=tx(op.x),cy=ty(op.y),r=Math.max(6,(op.dia/2)*sc);
+        if(Math.hypot(mx-cx,my-cy)<=r+4)hit=op;
+      } else if(op.type==='mill'&&op.pts?.length>=2){
+        // Hit test: distance from click to each segment
+        const hitR=Math.max(8,getMillDia(op.toolNum||1200)*sc/2+4);
+        for(let i=0;i<op.pts.length-1;i++){
+          const ax=tx(op.pts[i].x),ay=ty(op.pts[i].y);
+          const bx=tx(op.pts[i+1].x),by=ty(op.pts[i+1].y);
+          if(distPtSeg(mx,my,ax,ay,bx,by)<=hitR){hit=op;break;}
+        }
+      } else if(op.type==='blade'){
+        const ax=tx(op.x),ay=ty(op.y);
+        const bx=op.orient==='y'?ax:tx(op.x2??cfg.w);
+        const by2=op.orient==='y'?ty(op.y2??0):ay;
+        const hitR=Math.max(8,(op.width||4)*sc/2+4);
+        if(distPtSeg(mx,my,ax,ay,bx,by2)<=hitR)hit=op;
+      } else if(op.type==='saw'){
+        const ly=ty(op.y),lh=Math.max(4,Math.abs((op.width||3.6)*sc));
+        if(mx>=tx(0)&&mx<=tx(cfg.w)&&my>=ly-4&&my<=ly+lh+4)hit=op;
+      }
+    });
+    if(hit)selectOp(hit.ws,true);
+  };
+}
+
+/* ─── HOLE DIMENSIONS (Y-flipped: Y=0 at canvas bottom) ──────────── */
+function drawHoleDims(cfg,drills,tx,ty,d,dimInit,dimStep){
+  const col=d?'#f2c761':'#9a4b18',tcol=d?'#cdccca':'#28251d';
+  const uX=[...new Set(drills.map(o=>o.x))].sort((a,b)=>a-b);
+  const uY=[...new Set(drills.map(o=>o.y))].sort((a,b)=>a-b);
+
+  // Horizontal dims BELOW the board (below ty(0) = canvas bottom of board after Y-flip)
+  uX.forEach((xv,i)=>{
+    const xe=tx(0),xh=tx(xv);
+    const yd=ty(0)+dimInit+20+i*dimStep; // below canvas-bottom of board
+    ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=.85;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(xe,ty(0)+3);ctx.lineTo(xe,yd-4);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(xh,ty(0)+3);ctx.lineTo(xh,yd-4);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(xe,yd);ctx.lineTo(xh,yd);ctx.stroke();
+    arrowH(xe,yd,-1,col,5); arrowH(xh,yd,+1,col,5);
+    ctx.fillStyle=tcol;ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
+    ctx.fillText(`${fv(xv)} mm`,(xe+xh)/2,yd-5);
+    ctx.restore();
+  });
+
+  // Vertical dims RIGHT of board
+  // After Y-flip: ty(0) = canvas bottom (board physical bottom), ty(yv) < ty(0) for yv>0
+  uY.forEach((yv,i)=>{
+    const yBoardBottom=ty(0); // canvas Y of physical Y=0 (bottom edge)
+    const yHole=ty(yv);       // canvas Y of hole (above board bottom = smaller canvas Y)
+    const xd=tx(cfg.w)+dimInit+20+i*dimStep;
+    ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=.85;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(tx(cfg.w)+3,yBoardBottom);ctx.lineTo(xd-4,yBoardBottom);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(tx(cfg.w)+3,yHole);ctx.lineTo(xd-4,yHole);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(xd,yBoardBottom);ctx.lineTo(xd,yHole);ctx.stroke();
+    // After Y-flip: board bottom is at large canvas Y → arrow at bottom points DOWN (+1), at hole points UP (-1)
+    arrowV(xd,yBoardBottom,+1,col,5);
+    arrowV(xd,yHole,-1,col,5);
+    ctx.fillStyle=tcol;ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
+    ctx.save();ctx.translate(xd+Math.ceil(labelFontSize/2)-2,(yBoardBottom+yHole)/2);ctx.rotate(Math.PI/2);
+    ctx.fillText(`${fv(yv)} mm`,0,0);
+    ctx.restore();ctx.restore();
+  });
+}
+
+/* ─── DIM HELPERS ────────────────────────────────────────────────── */
+function drawDimH(x1,x2,y,lbl,col,tcol){
+  ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.stroke();
+  tickV(x1,y);tickV(x2,y);
+  arrowH(x1,y,-1,col,7);arrowH(x2,y,+1,col,7);
+  ctx.fillStyle=tcol;ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';ctx.fillText(lbl,(x1+x2)/2,y+labelFontSize+4);ctx.restore();
+}
+function drawDimV(x,y1,y2,lbl,col,tcol){
+  // y1=canvas top of board (small Y), y2=canvas bottom (large Y) after flip
+  ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(x,y1);ctx.lineTo(x,y2);ctx.stroke();
+  tickH(x,y1);tickH(x,y2);
+  arrowV(x,y1,-1,col,7); // top: points up (outward)
+  arrowV(x,y2,+1,col,7); // bottom: points down (outward)
+  ctx.fillStyle=tcol;ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
+  // Always offset by half font-size + 4px so text clears the line at any font size
+  ctx.save();ctx.translate(x+Math.ceil(labelFontSize/2)-2,(y1+y2)/2);ctx.rotate(Math.PI/2);ctx.fillText(lbl,0,0);ctx.restore();ctx.restore();
+}
+function tickV(x,y){ctx.beginPath();ctx.moveTo(x,y-6);ctx.lineTo(x,y+6);ctx.stroke();}
+function tickH(x,y){ctx.beginPath();ctx.moveTo(x-6,y);ctx.lineTo(x+6,y);ctx.stroke();}
+/* Tip exactly at (x,y). dir=+1 → points right/down; -1 → left/up. Body goes toward center (-dir). */
+function arrowH(x,y,dir,col,s){
+  ctx.save();ctx.fillStyle=col;
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-dir*s,y-s*.45);ctx.lineTo(x-dir*s,y+s*.45);
+  ctx.closePath();ctx.fill();ctx.restore();
+}
+function arrowV(x,y,dir,col,s){
+  ctx.save();ctx.fillStyle=col;
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-s*.45,y-dir*s);ctx.lineTo(x+s*.45,y-dir*s);
+  ctx.closePath();ctx.fill();ctx.restore();
+}
+
+/* ─── ROTATION 90° CW (viewed from above) ───────────────────────── 
+   Physics: board rotates CW → face labels from fixed viewer's perspective:
+   FRONT→LEFT, LEFT→BACK, BACK→RIGHT, RIGHT→FRONT
+   Coordinate transforms (face-local x coord):
+   FRONT→LEFT:  new_x = old_DL − old_x
+   LEFT→BACK:   new_x = old_DH − old_x
+   BACK→RIGHT:  new_x unchanged
+   RIGHT→FRONT: new_x unchanged
+   DL, DH swap after
+*/
+function rotate90CW(){
+  if(!LOADED)return;
+  const hasBlade=OPS.some(o=>o.type==='blade'||o.type==='saw');
+  if(hasBlade){
+    if(!confirm('Element zawiera piłkę (cięcie).\nZostaną one usunięte podczas obrotu.\n\nKontynuować?'))return;
+    OPS=OPS.filter(o=>o.type!=='blade'&&o.type!=='saw');
+  }
+  const oL=EL.DL,oH=EL.DH;
+  OPS.forEach(op=>{
+    if(op.side==='TOP'){
+      // 90° CW on TOP: point (x,y) → (y, DL−x)
+      if(op.type==='drill'||op.type==='saw'){
+        const nx=op.y,ny=oL-op.x;op.x=nx;op.y=ny;
+      } else if(op.type==='blade'){
+        // Rotate both endpoints 90° CW: (x,y)→(y, DL−x)
+        // Works for any orientation: simply transform both geometric endpoints
+        const p1x=op.x,  p1y=op.y;
+        const p2x=op.orient==='y'?op.x:(op.x2??op.x);
+        const p2y=op.orient==='y'?(op.y2??op.y):op.y;
+        const n1x=p1y, n1y=oL-p1x;
+        const n2x=p2y, n2y=oL-p2x;
+        // After rotation: if n1x≈n2x → Y-cut (constant X), else X-cut
+        if(Math.abs(n1x-n2x)<0.01){
+          // Y-cut
+          op.x=n1x; op.x2=n1x;
+          op.y=Math.min(n1y,n2y); op.y2=Math.max(n1y,n2y);
+          op.orient='y';
+        } else {
+          // X-cut
+          op.x=Math.min(n1x,n2x); op.x2=Math.max(n1x,n2x);
+          op.y=n1y; op.y2=n1y;
+          op.orient='x';
+        }
+      } else if(op.type==='mill'&&op.pts){
+        op.pts=op.pts.map(p=>({x:p.y,y:oL-p.x}));
+        op.x=op.pts[0]?.x??0;op.y=op.pts[0]?.y??0;
+      }
+    } else {
+      // Side walls rotate: board turns CW viewed from above
+      // Physical face mapping: FRONT→RIGHT, RIGHT→BACK, BACK→LEFT, LEFT→FRONT
+      // (opposite to what label-based rotation said before)
+      const sidemap={FRONT:'RIGHT',RIGHT:'BACK',BACK:'LEFT',LEFT:'FRONT'};
+      // Local X coordinate transforms (face-local x within new DL/DH):
+      // FRONT side: x goes 0..DL, after CW rotation new face is RIGHT, x maps to 0..DH unchanged
+      // RIGHT side: x goes 0..DH, after CW rotation new face is BACK, x maps reversed: DH-x
+      // BACK side: x goes 0..DL, after CW rotation new face is LEFT, x maps reversed: DL-x (wait...)
+      // Actually let me derive from geometry:
+      // Board before: DL along X, DH along Z (depth). After CW: what was DH is now DL.
+      // FRONT face (z=-DH/2): local x = 0..DL. After CW, this face becomes RIGHT (x=+DL_new/2=+DH/2).
+      //   Local x on FRONT measured from left = same direction → new x on RIGHT = old_x, range 0..DL (=new DH)
+      // RIGHT face (x=+DL/2): local x = 0..DH. After CW, this face becomes BACK (z=+DH_new/2=+DL/2).
+      //   Local x on RIGHT measured left-to-right looking from right = from near to far (z) direction.
+      //   After CW the near edge is now at new DH end → new_x = DH - old_x
+      // BACK face (z=+DH/2): local x = 0..DL. After CW, becomes LEFT (x=-DL_new/2=-DH/2).
+      //   New_x = DL - old_x (mirrored)
+      // LEFT face (x=-DL/2): local x = 0..DH. After CW, becomes FRONT (z=-DH_new/2=-DL/2).
+      //   New_x = old_x (unchanged, but range 0..DH = new DL)
+      const coordmap={
+        FRONT: x=>x,           // 0..DL → 0..new_DH (no change)
+        RIGHT: x=>oH-x,        // 0..DH → reversed
+        BACK:  x=>oL-x,        // 0..DL → reversed
+        LEFT:  x=>x,           // 0..DH → 0..new_DL (no change)
+      };
+      if(sidemap[op.side]){
+        const mapX=coordmap[op.side];
+        const nx=mapX(op.x);
+        const nx2=mapX(op.type==='blade'?(op.orient==='y'?op.x:(op.x2??op.x)):op.x);
+        op.x=Math.min(nx,nx2);
+        if(op.type==='blade'){op.x2=Math.max(nx,nx2);}
+        if(op.type==='mill'&&op.pts)op.pts=op.pts.map(p=>({x:mapX(p.x),y:p.y}));
+        op.side=sidemap[op.side];
+      }
+    }
+  });
+  EL.DL=oH;EL.DH=oL;
+  // Post-rotation label correction: swap FRONT↔BACK and LEFT↔RIGHT
+  // Simultaneously mirror #1 (x) for ops that land on FRONT or LEFT
+  const finalSwap={FRONT:'BACK',BACK:'FRONT',LEFT:'RIGHT',RIGHT:'LEFT'};
+  OPS.forEach(op=>{
+    const newSide=finalSwap[op.side];
+    if(!newSide)return;
+    // Mirror x for ops that will be on FRONT or LEFT after swap
+    // FRONT face width = DL_new = EL.DL (already swapped above)
+    // LEFT  face width = DH_new = EL.DH (already swapped above)
+    if(newSide==='FRONT'||newSide==='LEFT'){
+      const fw=newSide==='FRONT'?EL.DL:EL.DH;
+      const mx=x=>fw-x;
+      if(op.type==='blade'){
+        const rx=mx(op.x), rx2=mx(op.x2??op.x);
+        op.x=Math.min(rx,rx2);op.x2=Math.max(rx,rx2);
+      } else if(op.type==='mill'&&op.pts){
+        op.pts=op.pts.map(p=>({x:mx(p.x),y:p.y}));
+        op.x=op.pts[0]?.x??0;op.y=op.pts[0]?.y??0;
+      } else {
+        op.x=mx(op.x);
+      }
+    }
+    op.side=newSide;
+  });
+  document.getElementById('ed-dl').value=EL.DL;
+  document.getElementById('ed-dh').value=EL.DH;
+  document.getElementById('dim-lbl').textContent=`${EL.DL} × ${EL.DH} × ${EL.DS} mm`;
+  renderOps();buildScene(true);if(curView!=='3d')draw2D();showToast('✓ Obrócono 90° CW');
+}
+
+/* ─── EXPORT ─────────────────────────────────────────────────────── */
+function buildTCNText(){
+  // Deduplicate drills (same side+x+y+z+dia)
+  const seen=new Set();
+  const ops=OPS.filter(op=>{
+    if(op.type!=='drill')return true;
+    const key=`${op.side}|${op.x}|${op.y}|${op.z}|${op.dia}`;
+    if(seen.has(key))return false;seen.add(key);return true;
+  });
+  const sN={TOP:1,FRONT:3,RIGHT:4,BACK:5,LEFT:6};
+  const sO=['TOP','FRONT','RIGHT','BACK','LEFT'];
+  const lines=[];
+  lines.push('TPA\\ALBATROS\\EDICAD\\02.00:1333:r0w0h0s4');
+  lines.push('::SIDE=1;3;4;5;6;');
+  lines.push(`::UNm DL=${EL.DL} DH=${EL.DH} DS=${EL.DS}`);
+  lines.push("'tcn version=2.4.14");lines.push("'code=ansi");
+  lines.push('SIDE#0{');lines.push('}SIDE');
+  sO.forEach(side=>{
+    lines.push(`SIDE#${sN[side]}{`);lines.push(`$=${side}`);
+    ops.filter(o=>o.side===side).forEach(o=>{
+      if(o.type==='drill')
+        lines.push(`W#81{ ::WTp WS=${o.ws}  #8015=0 #1=${o.x} #2=${o.y} #3=${o.z} #1002=${o.dia} #201=1 #203=1 #1001=0 }W`);
+      else if(o.type==='saw')
+        lines.push(`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=${o.x} #2=${o.y} #3=${o.z} #201=1 #203=1 #205=1200 #1001=${o.width||3.6} #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 }W`);
+      else if(o.type==='mill'&&o.pts?.length>=2){
+        // First point is start (in W#89), rest in W#2201
+        lines.push(`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=${o.pts[0].x} #2=${o.pts[0].y} #3=${o.z} #201=1 #203=1 #205=${o.toolNum||1200} #1001=1 #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 #8180=0 #8181=0 #8185=0 #8186=0 }W`);
+        o.pts.slice(1).forEach(p=>lines.push(`W#2201{ ::WTl  #8015=0 #1=${p.x} #2=${p.y} #3=${o.z} #42=0 #49=0 }W`));
+      } else if(o.type==='blade'){
+        // X-cut: #8510=x, #8511=y, #8517=x2
+        // Y-cut: #8510=x, #8511=y, #8517=x (same x, but different y via y2)
+        const x1=o.x,y1=o.y,x2=o.orient==='y'?o.x:o.x2??x1;
+        lines.push(`W#1050{ ::WT2 WS=${o.ws}  #8098=..\\custom\\mcr\\lame.tmcr #6=1 #8015=0 #8503=${o.width||4} #8509=0 #8510=${x1} #8511=${y1} #8512=${o.z} #8513=${o.z} #8514=1 #8515=1 #8516=${o.toolNum||1151} #8517=${x2} #8525=2 #8526=0 #8527=1 }W`);
+      }
+    });
+    lines.push('}SIDE');
+  });
+  return lines.join('\r\n');
+}
+
+async function saveTCN(){
+  if(!LOADED)return;
+  const txt=buildTCNText();
+  if(fileHandle){
+    try{
+      const w=await fileHandle.createWritable();
+      await w.write(txt);await w.close();
+      await IDB.set('lastHandle',fileHandle);
+      brInvalidateThumb(fileName);
+      showToast('✓ Zapisano: '+fileName);return;
+    }catch(e){console.warn('FSA write failed:',e);}
+  }
+  downloadTCN(txt,fileName);showToast('✓ Pobrano: '+fileName);
+}
+
+async function saveTCNAs(){
+  if(!LOADED)return;
+  const txt=buildTCNText();
+  if('showSaveFilePicker' in window){
+    try{
+      const startRef=await IDB.get('lastHandle').catch(()=>null);
+      const h=await window.showSaveFilePicker({
+        suggestedName:fileName,
+        startIn:startRef??undefined,
+        types:[{description:'TCN files',accept:{'text/plain':['.TCN','.tcn']}}]
+      });
+      const w=await h.createWritable();
+      await w.write(txt);await w.close();
+      fileHandle=h;fileName=h.name;
+      await IDB.set('lastHandle',h);
+      brInvalidateThumb(fileName);
+      const nb=document.getElementById('file-name-badge');
+      if(nb)nb.textContent=fileName;
+      showToast('✓ Zapisano jako: '+fileName);return;
+    }catch(e){if(e.name==='AbortError')return;console.warn(e);}
+  }
+  const name=prompt('Nazwa pliku:',fileName.replace(/\.TCN$/i,''));
+  if(!name)return;
+  const fn=name.toUpperCase().endsWith('.TCN')?name:name+'.TCN';
+  downloadTCN(txt,fn);showToast('✓ Pobrano jako: '+fn);
+}
+
+function downloadTCN(txt,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));
+  a.download=name;a.click();
+}
+
+/* Invalidate cached thumbnail and redraw tile for given filename */
+function brInvalidateThumb(name){
+  brThumbCache.delete(name);
+  // Find the tile in brPool and queue a redraw
+  const tile=brPool.find(t=>brFiltered[t.idx]?.name===name);
+  if(tile){
+    const f=brFiltered[tile.idx];
+    const cv=tile.el.querySelector('canvas');
+    if(f&&cv){
+      const c=cv.getContext('2d');
+      c.fillStyle=dk()?'#2d2c2a':'#e6e4df';c.fillRect(0,0,cv.width,cv.height);
+      brRendQ.push({f,cv,el:tile.el});
+      brDrainRendQ();
+    }
+  }
+}
+
+/* ─── IDB – remember last open/save directory via file handle ──── */
+const IDB={
+  _db:null,
+  open(){return this._db||(this._db=new Promise((res,rej)=>{
+    const r=indexedDB.open('tpa-viewer',2);
+    r.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains('kv'))db.createObjectStore('kv');
+    };
+    r.onsuccess=e=>res(e.target.result);r.onerror=rej;
+  }));},
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readonly');const r=t.objectStore('kv').get(k);r.onsuccess=()=>res(r.result??null);r.onerror=rej;});},
+  async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=rej;});}
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   FILE BROWSER
+   ═══════════════════════════════════════════════════════════════════ */
+let brDirHandle=null;          // current directory FileSystemDirectoryHandle
+let brAllFiles=[];             // [{name, handle, lastModified}] full sorted list
+let brFiltered=[];             // after search filter
+let brSort='name';             // 'name'|'date'
+let brThumbW=90;               // thumbnail width px
+let brActiveName=null;         // currently open file name
+const BR_CONCUR=4;             // max simultaneous thumb renders
+const brThumbCache=new Map();  // name → dataURL
+let brRendQ=[];                // pending render queue
+let brRendActive=0;
+let brScrollRAF=null;
+
+// Virtual scroll state
+let brItemH=0;           // item height px (set after first render)
+let brCols=1;
+
+function brThumbH(){ return Math.round(brThumbW*0.55)+28+16; } // canvas+name+meta
+
+async function brRestoreDir(){
+  const h=window._pendingDirHandle;
+  if(!h)return;
+  try{
+    const perm=await h.requestPermission({mode:'read'});
+    if(perm==='granted'){
+      brDirHandle=h;
+      document.getElementById('fbr-restore-bar').classList.add('hidden');
+      await brLoadDir();
+    }
+  }catch(e){console.warn('restore dir:',e);}
+}
+
+async function brPickDir(){
+  if(!('showDirectoryPicker' in window)){showToast('Przeglądarka nie obsługuje wyboru katalogu',true);return;}
+  try{
+    const startRef=await IDB.get('brDirHandle').catch(()=>null);
+    const h=await window.showDirectoryPicker({startIn:startRef??'documents',mode:'read'});
+    brDirHandle=h;
+    await IDB.set('brDirHandle',h);
+    await brLoadDir();
+  }catch(e){if(e.name!=='AbortError')console.error(e);}
+}
+
+async function brLoadDir(){
+  if(!brDirHandle)return;
+  document.getElementById('fbr-status').textContent='Ładowanie…';
+  const files=[];
+  try{
+    for await(const [name,fh] of brDirHandle.entries()){
+      if(fh.kind==='file'&&/\.(tcn)$/i.test(name)){
+        files.push({name,handle:fh,lastModified:0,size:0});
+      }
+    }
+  }catch(e){console.error(e);document.getElementById('fbr-status').textContent='Błąd odczytu';return;}
+  // Get modified dates in background (batches of 10)
+  brAllFiles=files;
+  brApplySort();
+  brApplySearch();
+  document.getElementById('fbr-status').textContent=brDirHandle.name;
+  // Fetch dates async without blocking
+  brFetchDates(files);
+}
+
+async function brFetchDates(files){
+  const BATCH=20;
+  for(let i=0;i<files.length;i+=BATCH){
+    const chunk=files.slice(i,i+BATCH);
+    await Promise.all(chunk.map(async f=>{
+      try{const file=await f.handle.getFile();f.lastModified=file.lastModified;f.size=file.size;}catch(e){}
+    }));
+    if(brSort==='date'){brApplySort();brApplySearch();}
+  }
+}
+
+let brDateDir='desc'; // 'desc'=newest first, 'asc'=oldest first
+
+function setBrSort(s){
+  if(s==='date'&&brSort==='date'){
+    brDateDir=brDateDir==='desc'?'asc':'desc';
+  }
+  brSort=s;
+  document.getElementById('sort-name').classList.toggle('act',s==='name');
+  const dateBtn=document.getElementById('sort-date');
+  dateBtn.classList.toggle('act',s==='date');
+  dateBtn.textContent='Data '+(s==='date'?(brDateDir==='desc'?'↓':'↑'):'↓');
+  brApplySort();brApplySearch();
+}
+
+function brApplySort(){
+  if(brSort==='name') brAllFiles.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  else if(brDateDir==='desc') brAllFiles.sort((a,b)=>b.lastModified-a.lastModified);
+  else brAllFiles.sort((a,b)=>a.lastModified-b.lastModified);
+}
+
+let brSearchTimer=null;
+function brOnSearchInput(e){
+  clearTimeout(brSearchTimer);
+  let v=e.target.value;
+  // Barcode scanner sends 'filename.tcn%' – strip trailing %
+  if(v.endsWith('%')){
+    v=v.slice(0,-1);
+    e.target.value=v;
+    // Filter list to show the scanned file at top
+    brApplySearch();
+    // Auto-load if exact match
+    const match=brAllFiles.find(f=>f.name.toLowerCase()===v.toLowerCase()||
+      f.name.toLowerCase()===v.toLowerCase()+'.tcn'||
+      f.name.toLowerCase().replace(/\.tcn$/i,'')===v.toLowerCase().replace(/\.tcn$/i,''));
+    if(match){
+      brOpenFile(match).then(()=>{
+        // Clear search field after successful open so next scan works immediately
+        document.getElementById('fbr-search').value='';
+        brApplySearch();
+      });
+    }
+    return;
+  }
+  brSearchTimer=setTimeout(()=>brApplySearch(),120);
+}
+
+function brApplySearch(){
+  const q=document.getElementById('fbr-search').value.replace(/%$/,'').trim().toLowerCase();
+  brFiltered=q?brAllFiles.filter(f=>f.name.toLowerCase().includes(q)):brAllFiles;
+  document.getElementById('fbr-count').textContent=brFiltered.length+' plików';
+  brRendQ=[];brRendActive=0;
+  brBuildGrid();
+}
+
+function setBrThumbSize(w){
+  brThumbW=w;
+  IDB.set('brThumbW',w).catch(()=>{});
+  brThumbCache.clear();brRendQ=[];brRendActive=0;
+  brBuildGrid();
+}
+
+/* ── Stable fixed-tile virtual scroll ─────────────────────────────
+   Strategy: the list container has a single inner div with fixed
+   pixel height = rows × itemH. Each visible tile is absolutely
+   positioned. On scroll we just reposition/recycle DOM tiles.
+   No spacer divs fighting with flex-wrap layout.
+   ──────────────────────────────────────────────────────────────── */
+const TILE_POOL=[];       // recycled DOM tile elements
+let brPool=[];            // active tiles {el, idx}
+let brInnerH=0;           // total grid height
+let brGridInner=null;     // the absolutely-positioned inner div
+
+function brThumbCanvasH(){ return Math.round(brThumbW*0.55); }
+// Each tile height: canvas + name (labelFontSize+2) + meta (10px) + padding + gaps
+function brTileH(){ return brThumbCanvasH()+labelFontSize+10+16+6; }
+function brTileW(){ return brThumbW+8; } // +8 for padding
+
+function brBuildGrid(){
+  const list=document.getElementById('fbr-list');
+  // Remove spacers and old inner if present
+  document.getElementById('fbr-spt').style.height='0';
+  document.getElementById('fbr-spb').style.height='0';
+
+  if(!brGridInner){
+    brGridInner=document.getElementById('fbr-items');
+    brGridInner.style.cssText='position:relative;width:100%';
+  }
+
+  brPool=[];brGridInner.innerHTML='';
+  const cols=brGetCols();
+  const rows=Math.ceil(brFiltered.length/cols);
+  const tH=brTileH();
+  brInnerH=rows*tH;
+  brGridInner.style.height=brInnerH+'px';
+  brRendQ=[];brRendActive=0;
+  brVScrollRender();
+}
+
+function brGetCols(){
+  const list=document.getElementById('fbr-list');
+  const w=list.clientWidth-12;
+  return Math.max(1,Math.floor(w/brTileW()));
+}
+
+let brVScrollRAF=null;
+let brScrollSettleTimer=null;
+function brOnScroll(){
+  brRendQ=[];  // cancel pending thumb loads while scrolling fast
+  if(brVScrollRAF)return;
+  brVScrollRAF=requestAnimationFrame(()=>{
+    brVScrollRAF=null;
+    brPositionTiles(); // instant reposition, no file I/O
+  });
+  clearTimeout(brScrollSettleTimer);
+  brScrollSettleTimer=setTimeout(()=>{
+    brLoadVisibleThumbs(); // only after scroll stops
+  },200);
+}
+
+function brVScrollRender(){
+  brPositionTiles();
+  brLoadVisibleThumbs();
+}
+
+function brPositionTiles(){
+  if(!brGridInner||!brFiltered.length)return;
+  const list=document.getElementById('fbr-list');
+  const scrollTop=list.scrollTop;
+  const visH=list.clientHeight;
+  const cols=brGetCols();
+  const tH=brTileH();
+  const tW=brTileW();
+  const gapX=Math.max(4,Math.floor((list.clientWidth-12-cols*tW)/(cols+1)));
+
+  const firstRow=Math.max(0,Math.floor(scrollTop/tH)-1);
+  const lastRow=Math.min(Math.ceil(brFiltered.length/cols)-1,
+                         Math.ceil((scrollTop+visH)/tH)+1);
+  const firstIdx=firstRow*cols;
+  const lastIdx=Math.min(brFiltered.length-1,(lastRow+1)*cols-1);
+
+  // Build set of needed indices
+  const needed=new Set();
+  for(let i=firstIdx;i<=lastIdx;i++)needed.add(i);
+
+  // Recycle tiles that scrolled out
+  brPool=brPool.filter(t=>{
+    if(!needed.has(t.idx)){
+      t.el.style.display='none';
+      t.el.dataset.idx='';
+      TILE_POOL.push(t.el);
+      return false;
+    }
+    needed.delete(t.idx); // already rendered
+    return true;
+  });
+
+  // Create/recycle tiles for new indices
+  needed.forEach(idx=>{
+    const f=brFiltered[idx];
+    const el=TILE_POOL.pop()||brMakeTile();
+    const col=idx%cols, row=Math.floor(idx/cols);
+    const x=gapX+col*(tW+gapX);
+    const y=row*tH;
+    el.style.cssText=`position:absolute;left:${x}px;top:${y}px;width:${brThumbW}px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;border-radius:4px;border:1px solid transparent;cursor:pointer;box-sizing:border-box`;
+    el.dataset.name=f.name;
+    el.dataset.idx=idx;
+    el.onclick=()=>brOpenFile(f);
+    // Update name / meta
+    const nm=el.querySelector('.fb-name');
+    nm.textContent=f.name.replace(/\.tcn$/i,'');
+    nm.title=f.name;
+    nm.style.fontSize=labelFontSize+'px';
+    const mt=el.querySelector('.fb-meta');
+    mt.textContent=f.lastModified?new Date(f.lastModified).toLocaleDateString('pl'):'';
+    // Canvas size
+    const cv=el.querySelector('canvas');
+    cv.width=brThumbW;cv.height=brThumbCanvasH();
+    cv.style.width=brThumbW+'px';cv.style.height=brThumbCanvasH()+'px';
+    // Clear canvas to placeholder colour
+    const c=cv.getContext('2d');
+    c.fillStyle=dk()?'#2d2c2a':'#e6e4df';c.fillRect(0,0,cv.width,cv.height);
+    // Active state
+    if(f.name===brActiveName){el.style.borderColor='var(--pri)';el.style.background='color-mix(in oklch,var(--pri) 10%,var(--surf2))';}
+    else{el.style.borderColor='transparent';el.style.background='transparent';}
+    // Apply cached thumb immediately if available
+    if(brThumbCache.has(f.name)){
+      const img=new Image();img.src=brThumbCache.get(f.name);img.onload=()=>{if(el.dataset.name===f.name){const cc=el.querySelector('canvas');if(cc){const ctx=cc.getContext('2d');ctx.drawImage(img,0,0,cc.width,cc.height);}}};
+    }
+    brGridInner.appendChild(el);
+    brPool.push({el,idx});
+  });
+}
+
+function brMakeTile(){
+  const el=document.createElement('div');el.className='fb-item';
+  const cv=document.createElement('canvas');cv.className='fb-thumb';el.appendChild(cv);
+  const nm=document.createElement('div');nm.className='fb-name';el.appendChild(nm);
+  const mt=document.createElement('div');mt.className='fb-meta';el.appendChild(mt);
+  return el;
+}
+
+function brLoadVisibleThumbs(){
+  // Queue thumb loads only for currently visible tiles
+  brRendQ=[];
+  brPool.forEach(({el,idx})=>{
+    const f=brFiltered[idx];
+    if(!f||brThumbCache.has(f.name))return;
+    const cv=el.querySelector('canvas');
+    if(cv)brRendQ.push({f,cv,el});
+  });
+  brDrainRendQ();
+}
+
+let brScrollTimer=null;  // kept for compat, unused now
+
+async function brDrainRendQ(){
+  while(brRendQ.length>0&&brRendActive<BR_CONCUR){
+    const {f,cv,el}=brRendQ.shift();
+    brRendActive++;
+    brRenderThumb(f,cv,el).finally(()=>{brRendActive--;brDrainRendQ();});
+  }
+}
+
+async function brRenderThumb(f,cv,el){
+  try{
+    if(brThumbCache.has(f.name)){
+      drawCachedThumb(f.name,cv);return;
+    }
+    const file=await f.handle.getFile();
+    if(!f.lastModified){f.lastModified=file.lastModified;
+      const mt=el?.querySelector('.fb-meta');
+      if(mt)mt.textContent=new Date(f.lastModified).toLocaleDateString('pl');
+    }
+    const txt=await file.text();
+    const dataURL=brDrawThumb(txt,cv.width,cv.height);
+    if(dataURL){
+      brThumbCache.set(f.name,dataURL);
+      // Check tile still shows this file before drawing
+      if(el?.dataset.name===f.name)drawCachedThumb(f.name,cv);
+    }
+  }catch(e){/* ignore */}
+}
+
+function drawCachedThumb(name,cv){
+  const url=brThumbCache.get(name);if(!url)return;
+  const img=new Image();img.src=url;
+  img.onload=()=>{const c=cv.getContext('2d');c.drawImage(img,0,0,cv.width,cv.height);};
+}
+
+function brDrawThumb(txt,W,H){
+  const dim=txt.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)/i);
+  if(!dim)return null;
+  const DL=parseFloat(dim[1]),DH=parseFloat(dim[2]);
+  const oc=document.createElement('canvas');oc.width=W;oc.height=H;
+  const c=oc.getContext('2d');
+  const d=dk();
+  c.fillStyle=d?'#1c1b19':'#f9f8f5';c.fillRect(0,0,W,H);
+  const pad=6;
+  const sc=Math.min((W-pad*2)/DL,(H-pad*2)/DH);
+  const ox=(W-DL*sc)/2,oy=(H-DH*sc)/2;
+  // Board
+  c.fillStyle=d?'#5a3010':'#c8a060';c.fillRect(ox,oy,DL*sc,DH*sc);
+  c.strokeStyle=d?'#4f98a3':'#01696f';c.lineWidth=1;c.strokeRect(ox,oy,DL*sc,DH*sc);
+  // TOP drills
+  const sideRe=/SIDE#1\{([\s\S]*?)\}SIDE/;const sm=txt.match(sideRe);
+  if(sm){
+    const drRe=/W#81\{[^}]*#1=([\d.\-]+)[^}]*#2=([\d.\-]+)[^}]*#1002=([\d.\-]+)/g;
+    let dm;
+    while((dm=drRe.exec(sm[1]))){
+      const x=parseFloat(dm[1]),y=parseFloat(dm[2]),dia=parseFloat(dm[3]);
+      const cx=ox+x*sc,cy=oy+(DH-y)*sc,r=Math.max(1,(dia/2)*sc);
+      c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);
+      c.fillStyle=d?'#050505':'#0d0d0d';c.fill();
+      c.strokeStyle=d?'#4f98a3':'#01696f';c.lineWidth=.7;c.stroke();
+    }
+    // Blades & saw lines
+    const blRe=/W#1050\{[^}]*#8510=([\d.\-]+)[^}]*#8511=([\d.\-]+)[^}]*#8517=([\d.\-]+)/g;
+    let bl;
+    while((bl=blRe.exec(sm[1]))){
+      const x1=parseFloat(bl[1]),y1=parseFloat(bl[2]),x2=parseFloat(bl[3]);
+      c.beginPath();c.moveTo(ox+x1*sc,oy+(DH-y1)*sc);c.lineTo(ox+x2*sc,oy+(DH-y1)*sc);
+      c.strokeStyle=d?'#f59e0b':'#d97706';c.lineWidth=1.5;c.stroke();
+    }
+  }
+  return oc.toDataURL();
+}
+
+async function brOpenFile(f){
+  brActiveName=f.name;
+  document.querySelectorAll('.fb-item').forEach(el=>el.classList.toggle('fbact',el.dataset.name===f.name));
+  try{
+    const file=await f.handle.getFile();
+    fileHandle=f.handle;
+    // For save: use the directory handle to write back
+    brSaveHandle=f.handle;
+    fileName=f.name;
+    await IDB.set('lastHandle',f.handle);
+    cameraFitted=false;
+    await loadFile(file);
+  }catch(e){showToast('Błąd otwarcia: '+e.message,true);}
+}
+
+// Override saveTCN to write back to same handle (already set via brOpenFile → fileHandle)
+let brSaveHandle=null;
+
+async function brInitFromIDB(){
+  try{
+    // Restore theme
+    const theme=await IDB.get('theme').catch(()=>null);
+    if(theme&&window._themeToggle)window._themeToggle.apply(theme);
+
+    // Restore label font size
+    const lfs=await IDB.get('labelFontSize').catch(()=>null);
+    if(lfs){labelFontSize=lfs;}
+
+    // Restore thumb size
+    const tw=await IDB.get('brThumbW').catch(()=>null);
+    if(tw){
+      brThumbW=tw;
+      const sl=document.getElementById('fbr-size');
+      if(sl)sl.value=tw;
+    }
+
+    // Restore panel width
+    const pw=await IDB.get('brPanelW').catch(()=>null);
+    if(pw){
+      const fbr=document.getElementById('fbr');
+      if(fbr){fbr.style.width=Math.max(180,Math.min(700,pw))+'px';onResize();}
+    }
+
+    // Restore last view
+    const lv=await IDB.get('lastView').catch(()=>null);
+    if(lv){switchView(lv);}
+
+    // Restore directory
+    const h=await IDB.get('brDirHandle');
+    if(h){
+      try{
+        const perm=await h.queryPermission({mode:'read'});
+        if(perm==='granted'){
+          brDirHandle=h;await brLoadDir();
+        } else {
+          // Can't call requestPermission without user gesture – show banner
+          window._pendingDirHandle=h;
+          document.getElementById('fbr-restore-bar').classList.remove('hidden');
+          document.getElementById('fbr-status').textContent='Wymaga zezwolenia';
+        }
+      }catch(e){console.warn('dir restore:',e);}
+    }
+  }catch(e){console.warn('brInitFromIDB:',e);}
+}
+
+// Init resize handle
+function initResizer(){
+  const rz=document.getElementById('rz');
+  const fbr=document.getElementById('fbr');
+  let startX,startW;
+  rz.addEventListener('mousedown',e=>{
+    startX=e.clientX;startW=fbr.offsetWidth;
+    rz.classList.add('rzdrag');
+    const onMove=ev=>{fbr.style.width=Math.max(180,Math.min(700,startW+ev.clientX-startX))+'px';onResize();brBuildGrid();};
+    const onUp=()=>{rz.classList.remove('rzdrag');document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);IDB.set('brPanelW',fbr.offsetWidth).catch(()=>{});};
+    document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
+  });
+}
+
+// Barcode search handler
+function initBarcodeSearch(){
+  const inp=document.getElementById('fbr-search');
+  inp.addEventListener('input',brOnSearchInput);
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){
+      const v=inp.value.replace(/%$/,'').trim();
+      const match=brFiltered.find(f=>f.name.replace(/\.tcn$/i,'').toLowerCase()===v.toLowerCase())
+        || brFiltered[0];
+      if(match){
+        brOpenFile(match).then(()=>{inp.value='';brApplySearch();});
+      }
+    }
+  });
+
+  /* ── Global barcode interceptor ─────────────────────────────────
+     Barcode scanners send characters very fast (< 50 ms per char)
+     and always finish with '%'. We buffer keystrokes globally; if
+     a sequence ends with '%' and all gaps were fast, we hijack it
+     into the search field regardless of current focus.
+     ─────────────────────────────────────────────────────────────── */
+  let bBuf='';         // accumulating characters
+  let bLast=0;         // timestamp of last keydown
+  const B_GAP=()=>toolSettings.scannerGap||80; // max ms between chars
+  const B_MIN=2;       // minimum chars before '%' to trigger
+
+  document.addEventListener('keydown', e=>{
+    // Ignore modifier-only keys, function keys, arrows, etc.
+    if(e.key.length!==1||e.ctrlKey||e.metaKey||e.altKey)return;
+
+    const now=Date.now();
+    const gap=now-bLast;
+    bLast=now;
+
+    if(gap>400){
+      // Long pause – start fresh buffer (could be user typing or new scan)
+      bBuf=e.key;
+    } else if(gap<=B_GAP()){
+      // Fast keystroke – part of scanner stream
+      bBuf+=e.key;
+    } else {
+      // Moderate gap – reset (probably normal typing)
+      bBuf=e.key;
+    }
+
+    if(e.key==='%'&&bBuf.length>B_MIN){
+      // Looks like a barcode scan – extract name (strip trailing %)
+      const scanned=bBuf.slice(0,-1).trim();
+      bBuf='';
+
+      // Only act if scanned string looks like a filename (not random input)
+      if(scanned.length<2)return;
+
+      // Redirect to search field
+      inp.value=scanned;
+      inp.focus();
+
+      // Filter list immediately
+      brApplySearch();
+
+      // Find and open
+      const match=brAllFiles.find(f=>
+        f.name.toLowerCase()===scanned.toLowerCase()||
+        f.name.toLowerCase()===scanned.toLowerCase()+'.tcn'||
+        f.name.toLowerCase().replace(/\.tcn$/i,'')===scanned.toLowerCase().replace(/\.tcn$/i,'')
+      );
+      if(match){
+        brOpenFile(match).then(()=>{inp.value='';brApplySearch();});
+      }
+
+      // Prevent the '%' from landing in whatever field was focused
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }, true); // capture phase – runs before any element's own handler
+}
+
+
+/* ─── FILE LOADING ───────────────────────────────────────────────── */
+async function setupFileLoading(){
+  const label=document.querySelector('label[for="fileInput"]');
+  if('showOpenFilePicker' in window){
+    label.removeAttribute('for');
+    label.onclick=async()=>{
+      try{
+        const startRef=await IDB.get('lastHandle').catch(()=>null);
+        const [h]=await window.showOpenFilePicker({
+          startIn:startRef??undefined,
+          types:[{description:'TCN files',accept:{'text/plain':['.TCN','.tcn','.txt']}}]
+        });
+        fileHandle=h;
+        await IDB.set('lastHandle',h);
+        const file=await h.getFile();
+        fileName=file.name;
+        await loadFile(file);
+      }catch(e){if(e.name!=='AbortError')console.error(e);}
+    };
+  }
+  document.getElementById('fileInput').addEventListener('change',async e=>{
+    const f=e.target.files?.[0];if(!f)return;
+    fileHandle=null;fileName=f.name;
+    await loadFile(f);e.target.value='';
+  });
+}
+
+async function loadFile(f){
+  try{
+    const txt=await f.text();
+    cameraFitted=false;
+    parseTCN(txt);setLoadedState(true,f.name);
+    renderOps();buildScene(true);if(curView!=='3d')draw2D();showToast('✓ Wczytano: '+f.name);
+  }catch(err){
+    console.error(err);OPS=[];EL={DL:0,DH:0,DS:0};setLoadedState(false,'');
+    renderOps();buildScene();draw2D();showToast('Błąd: '+err.message,true);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOOL SETTINGS
+   ═══════════════════════════════════════════════════════════════════ */
+// millTools: [{num: 1200, dia: 12}, ...]
+// sawTools:  [{num: 1161}, {num: 1151}, ...]  empty = show all
+let toolSettings={
+  millTools:[{num:1200,dia:8}],
+  sawTools:[],
+  scannerGap:80
+};
+
+function getMillDia(toolNum){
+  const t=toolSettings.millTools.find(t=>t.num===toolNum);
+  return t?t.dia:0; // 0 = unknown / just draw line
+}
+
+function sawToolAllowed(toolNum){
+  if(!toolSettings.sawTools.length)return true; // empty = show all
+  return toolSettings.sawTools.some(t=>t.num===toolNum);
+}
+
+async function loadToolSettings(){
+  try{
+    const s=await IDB.get('toolSettings');
+    if(s)toolSettings=s;
+  }catch(e){}
+}
+
+function openSettings(){
+  renderMillToolsTable();
+  renderSawToolsTable();
+  const gi=document.getElementById('set-bgap');
+  if(gi)gi.value=toolSettings.scannerGap||80;
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+function closeSettings(){
+  document.getElementById('settings-modal').classList.add('hidden');
+}
+
+function renderMillToolsTable(){
+  const tb=document.getElementById('mill-tools-body');
+  tb.innerHTML=toolSettings.millTools.map((t,i)=>`<tr>
+    <td><input type="number" value="${t.num}" step="1" min="1" onchange="toolSettings.millTools[${i}].num=+this.value"></td>
+    <td><input type="number" value="${t.dia}" step="0.5" min="0.1" onchange="toolSettings.millTools[${i}].dia=+this.value"></td>
+    <td class="td-del"><button class="btn-del" onclick="removeMillTool(${i})">✕</button></td>
+  </tr>`).join('');
+}
+function renderSawToolsTable(){
+  const tb=document.getElementById('saw-tools-body');
+  tb.innerHTML=toolSettings.sawTools.map((t,i)=>`<tr>
+    <td><input type="number" value="${t.num}" step="1" min="1" onchange="toolSettings.sawTools[${i}].num=+this.value"></td>
+    <td class="td-del"><button class="btn-del" onclick="removeSawTool(${i})">✕</button></td>
+  </tr>`).join('');
+}
+function addMillToolRow(){toolSettings.millTools.push({num:1200,dia:8});renderMillToolsTable();}
+function removeMillTool(i){toolSettings.millTools.splice(i,1);renderMillToolsTable();}
+function addSawToolRow(){toolSettings.sawTools.push({num:1161});renderSawToolsTable();}
+function removeSawTool(i){toolSettings.sawTools.splice(i,1);renderSawToolsTable();}
+
+async function saveSettings(){
+  // Read current values from inputs before saving
+  document.querySelectorAll('#mill-tools-body tr').forEach((tr,i)=>{
+    const ins=tr.querySelectorAll('input');
+    if(toolSettings.millTools[i]){
+      toolSettings.millTools[i].num=parseInt(ins[0].value)||1200;
+      toolSettings.millTools[i].dia=parseFloat(ins[1].value)||8;
+    }
+  });
+  document.querySelectorAll('#saw-tools-body tr').forEach((tr,i)=>{
+    const ins=tr.querySelectorAll('input');
+    if(toolSettings.sawTools[i])toolSettings.sawTools[i].num=parseInt(ins[0].value)||1161;
+  });
+  const gi=document.getElementById('set-bgap');
+  if(gi)toolSettings.scannerGap=Math.max(20,Math.min(300,parseInt(gi.value)||80));
+  await IDB.set('toolSettings',toolSettings);
+  closeSettings();
+  buildScene();
+  if(curView!=='3d')draw2D();
+  showToast('✓ Ustawienia zapisane');
+}
+
+// Close modal on backdrop click
+document.addEventListener('click',e=>{
+  if(e.target.id==='settings-modal')closeSettings();
+});
+
+(function(){
+  const tog=document.querySelector('[data-theme-toggle]'),root=document.documentElement;
+  let d='dark';root.setAttribute('data-theme',d);
+  const sun='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
+  const moon='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  tog.innerHTML=sun;
+  tog.addEventListener('click',()=>{
+    d=d==='dark'?'light':'dark';
+    root.setAttribute('data-theme',d);
+    tog.innerHTML=d==='dark'?sun:moon;
+    IDB.set('theme',d).catch(()=>{});
+    buildScene();if(curView!=='3d')draw2D();
+  });
+  // Theme restored in brInitFromIDB
+  window._themeToggle={apply:(t)=>{d=t;root.setAttribute('data-theme',d);tog.innerHTML=d==='dark'?sun:moon;}};
+})();
+
+window.addEventListener('load',()=>{
+  initThree();setupFileLoading();setLoadedState(false,'');renderOps();draw2D();
+  initResizer();initBarcodeSearch();
+  loadToolSettings().then(()=>brInitFromIDB());
+  window.addEventListener('resize',()=>{if(brFiltered.length)brBuildGrid();});
+});
+</script>
+</body>
+</html>
