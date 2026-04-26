@@ -27,9 +27,10 @@ header{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) var(--s6)
 .btn-del{padding:2px 7px;border-radius:var(--rsm);font-size:var(--txs);background:color-mix(in oklch,var(--warn) 12%,var(--surfoff));border:1px solid color-mix(in oklch,var(--warn) 30%,var(--bord));color:var(--warn)}.btn-del:hover{background:color-mix(in oklch,var(--warn) 25%,var(--surfoff))}
 /* main layout is set in browser panel CSS block below */
 .va{position:relative;overflow:hidden}
-.vtabs{position:absolute;top:var(--s4);left:var(--s4);display:flex;gap:2px;z-index:5;background:var(--surf);border:1px solid var(--bord);border-radius:var(--rlg);padding:3px}
+.vtabs{position:absolute;top:var(--s4);left:var(--s4);display:flex;gap:2px;z-index:20;background:var(--surf);border:1px solid var(--bord);border-radius:var(--rlg);padding:3px;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .tbtn{padding:var(--s1) var(--s3);border-radius:calc(var(--rlg) - 3px);font-size:var(--tsm);font-weight:500;color:var(--muted)}.tbtn.act{background:var(--pri);color:#fff}
-.dimbar{position:absolute;top:var(--s4);right:var(--s4);z-index:5;display:none}
+.dimbar{position:absolute;top:var(--s4);right:var(--s4);z-index:15;display:none;display:flex;gap:4px}
+.xray-bar-cls{position:absolute;top:var(--s4);z-index:15;display:none}
 #c3d,#c2d{position:absolute;inset:0;width:100%;height:100%}
 #c2d{display:none}
 .hint{position:absolute;bottom:var(--s4);left:50%;transform:translateX(-50%);font-size:var(--txs);color:var(--faint);pointer-events:none;white-space:nowrap;background:color-mix(in oklch,var(--surf) 86%,transparent);padding:6px 10px;border-radius:999px;border:1px solid var(--bord)}
@@ -194,15 +195,19 @@ main{display:flex;overflow:hidden}
       <button class="tbtn" id="tab-back" onclick="switchView('back')">BACK</button>
       <button class="tbtn" id="tab-right" onclick="switchView('right')">RIGHT</button>
       <button class="tbtn" id="tab-left" onclick="switchView('left')">LEFT</button>
+      <button class="tbtn" id="tab-code" onclick="switchView('code')">CODE</button>
     </div>
-    <div class="dimbar" id="dimbar" style="display:none">
-      <button class="btn-tog on" id="btn-dims" onclick="toggleDims()">📐 Wymiary</button>
-    </div>
-    <div class="dimbar" id="xray-bar">
+    <div style="position:absolute;top:var(--s4);right:var(--s4);z-index:15;display:flex;gap:4px;align-items:center" id="top-bar">
+      <button class="btn-tog on" id="btn-dims" onclick="toggleDims()" style="display:none">📐 Wymiary</button>
+      <button class="btn-tog on" id="btn-dia" onclick="toggleDrillDia()" style="display:none">⌀ Śred.</button>
+      <button class="btn-tog on" id="btn-dep" onclick="toggleDrillDepth()" style="display:none">↓ Głęb.</button>
       <button class="btn-tog" id="btn-xray" onclick="toggleXray()">👁 Przeźroczyste</button>
     </div>
     <canvas id="c3d"></canvas>
     <canvas id="c2d"></canvas>
+    <div id="c-code" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:80px var(--s4) var(--s4);background:var(--bg)">
+      <pre id="code-content" style="font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.6;color:var(--txt);background:var(--surf2);padding:var(--s4);border-radius:var(--rlg);border:1px solid var(--bord);white-space:pre-wrap;word-break:break-all;margin:0;min-height:calc(100% - var(--s8))"></pre>
+    </div>
     <div class="hint" id="hint">Lewy: obrót · Prawy: przesuw · Scroll: zoom</div>
   </div>
   <aside class="sb">
@@ -219,9 +224,17 @@ main{display:flex;overflow:hidden}
         </div>
         <button class="btn btn-sec" id="rotBtn" onclick="rotate90CW()" disabled style="width:100%;justify-content:center">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
-          <span id="rotBtn-label">Obróć 90° (TOP)</span>
+          <span id="rotBtn-label">Obróć 90°</span>
           <span id="rotBtn-warn" style="display:none;color:#f59e0b;font-size:20px;line-height:1" title="Element zawiera piłkę – zostanie usunięta przy obrocie">⚠</span>
         </button>
+        <button class="btn btn-sec" id="rot180Btn" onclick="rotate180()" disabled style="width:100%;justify-content:center;margin-top:4px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+          Obróć 180°
+        </button>
+      </div>
+      <div class="box" id="edge-box" style="display:none">
+        <h3>Okleina krawędzi</h3>
+        <div id="edge-info"></div>
       </div>
       <div id="ops-list"></div>
       <div id="add-wrap" class="hidden">
@@ -272,7 +285,7 @@ main{display:flex;overflow:hidden}
         <h3>Piłki – numery narzędzi (#8516)</h3>
         <p>Wpisz numery narzędzi piłki. Operacje W#1050 z tymi numerami będą wyświetlane jako piłki. Puste = wyświetlaj wszystkie.</p>
         <table class="tool-table" id="saw-tools-table">
-          <thead><tr><th>Nr narzędzia (#8516)</th><th></th></tr></thead>
+          <thead><tr><th>Nr narzędzia (#8516)</th><th>Szerokość rowka (mm)</th><th></th></tr></thead>
           <tbody id="saw-tools-body"></tbody>
         </table>
         <button class="btn btn-sec" style="margin-top:var(--s3);font-size:var(--txs)" onclick="addSawToolRow()">+ Dodaj numer piłki</button>
@@ -290,11 +303,17 @@ main{display:flex;overflow:hidden}
 let EL={DL:0,DH:0,DS:0};
 let OPS=[];
 let LOADED=false;
+let _rawTCN='';       // original file text verbatim
+let _rawHeader='';    // everything before first SIDE#
 // Decimal separator of the loaded file (',' or '.') – preserved on save
 let fileDecSep='.';
 // System locale decimal separator – used for UI display
 const SYS_DEC=(1.1).toLocaleString().replace(/\d/g,'').trim()||'.';
 let selWs=null,curFilter='ALL',curView='3d',showDims=true,xrayMode=false;
+let showDrillDia=true,showDrillDepth=true;
+// Edge banding: keys R,L,T,B (Right/Left/Top/Bottom in TOP-view coords)
+let EDGE={R:null,L:null,T:null,B:null}; // null = no banding, string = material name
+let _edgeNames={R:'Okleina PCV',L:'Okleina PCV',T:'Okleina PCV',B:'Okleina PCV'}; // last-known names
 
 /* ── Operation colour palette (dark / light theme) ── */
 const OPC={
@@ -338,7 +357,7 @@ function fvI(v){
 /* ─── STATE ────────────────────────────────────────────────────────── */
 function setLoadedState(ok,name=''){
   LOADED=ok;fileName=name||'element.TCN';
-  ['saveBtn','saveAsBtn','rotBtn'].forEach(id=>document.getElementById(id).disabled=!ok);
+  ['saveBtn','saveAsBtn','rotBtn','rot180Btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!ok;});
   document.getElementById('add-wrap').classList.toggle('hidden',!ok);
   // Header file name badge
   const nb=document.getElementById('file-name-badge');
@@ -360,47 +379,84 @@ function setLoadedState(ok,name=''){
 
 /* ─── PARSER ─────────────────────────────────────────────────────── */
 function parseTCN(txt){
-  // ── Detect and normalise decimal separator ───────────────────────
-  // Check if file uses comma: look for patterns like #1=380,5
-  fileDecSep=/[#=]\d+,\d/.test(txt) ? ',' : '.';
-  // Normalise to dots for internal parsing
-  if(fileDecSep===','){
-    txt=txt.replace(/(#[\w]+=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'));
-    txt=txt.replace(/(DL=|DH=|DS=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'));
-  }
+  _rawTCN=txt; // keep verbatim original
+  // Extract header (everything before first SIDE#)
+  const firstSide=txt.search(/SIDE#/);
+  _rawHeader=firstSide>=0?txt.slice(0,firstSide):'';
 
-  const dim=txt.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)\s+DS=([\d.\-]+)/i);
+  // ── Detect and normalise decimal separator ───────────────────────
+  fileDecSep=/[#=]\d+,\d/.test(txt) ? ',' : '.';
+  const normTxt=fileDecSep===','
+    ? txt.replace(/(#[\w]+=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'))
+         .replace(/(DL=|DH=|DS=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'))
+    : txt;
+
+  const dim=normTxt.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)\s+DS=([\d.\-]+)/i);
   if(!dim)throw new Error('Brak ::UNm');
   EL.DL=parseFloat(dim[1]);EL.DH=parseFloat(dim[2]);EL.DS=parseFloat(dim[3]);
   document.getElementById('ed-dl').value=EL.DL;
   document.getElementById('ed-dh').value=EL.DH;
   document.getElementById('ed-ds').value=EL.DS;
 
-  const sideMap={1:'TOP',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  EDGE={R:null,L:null,T:null,B:null};
+  const specM=normTxt.match(/SPEC\{([\s\S]*?)\}SPEC/);
+  if(specM){
+    const sp=specM[1];
+    const eg=(k)=>{const m=sp.match(new RegExp('EDGE'+k+'=([^\\s%;]+)'));return m?m[1]:null;};
+    EDGE.R=eg('R');EDGE.L=eg('L');EDGE.T=eg('T');EDGE.B=eg('B');
+    ['R','L','T','B'].forEach(k=>{if(EDGE[k])_edgeNames[k]=EDGE[k];});
+  }
+  // Extended sideMap: older TPA uses SIDE#2 and SIDE#5 for BACK
+  const sideMap={1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  // Also detect side by $=Label inside the body
+  const sideByLabel={'top':'TOP','bottom':'BOTTOM','front':'FRONT','rear':'BACK','back':'BACK','right':'RIGHT','left':'LEFT'};
   const sideRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
   const ops=[];let maxWs=0;let autoWs=500;let sm;
 
-  // Helper: parse numeric param, handles both '.' and ',' decimals
   const g=(raw,k,def=null)=>{
-    const m=raw.match(new RegExp('#'+k+'=([\\d.,\\-]+)'));
+    const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));
     if(!m)return def;
-    return parseFloat(m[1].replace(',','.'));
+    const val=m[1].replace(',','.');
+    if(/^l$/i.test(val))return EL.DL;
+    if(/^h$/i.test(val))return EL.DH;
+    if(/^s$/i.test(val))return EL.DS;
+    const v=parseFloat(val);
+    return isNaN(v)?def:v;
   };
-  const ws=(raw)=>{
-    const m=raw.match(/WS=(\d+)/)||raw.match(/WN=\S+/); // WN= as fallback name
-    const wm=raw.match(/WS=(\d+)/);
-    return wm?parseInt(wm[1]):null;
+  // gv: like g but rejects non-numeric values (variable names like 'l', 'b')
+  const gv=(raw,k,def=null)=>{
+    const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));
+    if(!m)return def;
+    const v=parseFloat(m[1].replace(',','.'));
+    return isNaN(v)?def:v;
   };
+  const ws=(raw)=>{const wm=raw.match(/WS=(\d+)/);return wm?parseInt(wm[1]):null;};
 
-  while((sm=sideRe.exec(txt))){
-    const side=sideMap[parseInt(sm[1])]||`SIDE${sm[1]}`;
+  // Use normalized text for parsing but keep original side blocks for raw storage
+  const origSideRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
+  // Build map of side# → original block text from raw
+  const origBlocks={};let osm;
+  while((osm=origSideRe.exec(txt))){origBlocks[parseInt(osm[1])]=osm[2];}
+
+  while((sm=sideRe.exec(normTxt))){
+    let side=sideMap[parseInt(sm[1])]||`SIDE${sm[1]}`;
+    const labelM=sm[2].match(/\$=(\w+)/);
+    if(labelM){const lk=labelM[1].toLowerCase();if(sideByLabel[lk])side=sideByLabel[lk];}
+    const sideNum=parseInt(sm[1]);
+    const origBody=origBlocks[sideNum]||sm[2]; // original (pre-normalize) body for raw storage
     const tokRe=/W#(\d+)\{([\s\S]*?)\}W/g;
     const toks=[];let t;
     while((t=tokRe.exec(sm[2])))toks.push({code:t[1],raw:t[2]});
 
+    // Also tokenize original body for raw line storage
+    const origTokRe=/W#(\d+)\{([\s\S]*?)\}W/g;
+    const origToks=[];let ot;
+    while((ot=origTokRe.exec(origBody)))origToks.push({full:`W#${ot[1]}{${ot[2]}}W`});
+
     let i=0;
     while(i<toks.length){
       const {code,raw}=toks[i];
+      const rawLine=origToks[i]?.full||`W#${code}{${raw}}W`; // original verbatim
       const wsid=ws(raw)??autoWs++;
       if(wsid>maxWs)maxWs=wsid;
 
@@ -413,16 +469,20 @@ function parseTCN(txt){
         if(dia===null)errors.push('brak śr. (#1002)');
         ops.push({ws:wsid,side,type:'drill',
           x:x??0,y:y??0,z:z??0,dia:dia??8,
+          _rawLine:rawLine,
           errors:errors.length?errors:null});
         i++;
 
       } else if(code==='89'){
         const startX=g(raw,'1',null),startY=g(raw,'2',null);
         const pts=[{x:startX??0,y:startY??0}];
+        // Collect raw 2201 lines too
+        const raw2201Lines=[];
         let j=i+1;
         while(j<toks.length&&toks[j].code==='2201'){
           const px=g(toks[j].raw,'1'),py=g(toks[j].raw,'2');
           if(px!==null&&py!==null)pts.push({x:px,y:py});
+          raw2201Lines.push(origToks[j]?.full||`W#2201{${toks[j].raw}}W`);
           j++;
         }
         if(pts.length>=2){
@@ -432,34 +492,43 @@ function parseTCN(txt){
           ops.push({ws:wsid,side,type:'mill',
             x:startX??0,y:startY??0,z:g(raw,'3',0),
             toolNum:(g(raw,'205',null)||1200)|0,
-            pts,errors:errors.length?errors:null});
+            pts,_rawLine:rawLine,_raw2201:raw2201Lines,
+            errors:errors.length?errors:null});
           i=j;
         } else {
           ops.push({ws:wsid,side,type:'saw',
-            x:startX??0,y:startY??0,z:g(raw,'3',0),width:g(raw,'1001',3.6)});
+            x:startX??0,y:startY??0,z:g(raw,'3',0),width:g(raw,'1001',3.6),
+            _rawLine:rawLine});
           i++;
         }
 
       } else if(code==='1050'){
-        // Standard format: #8510=xStart #8511=yConst #8517=xEnd #8512=depth
-        // Alternative format: #8020=xStart #8021=yConst #8022=depth (older TPA)
-        let x1=g(raw,'8510',null)??g(raw,'8020',null);
-        let y1=g(raw,'8511',null)??g(raw,'8021',null);
-        let dep=g(raw,'8512',null)??g(raw,'8022',null);
-        let x2=g(raw,'8517',null);
-        const w=g(raw,'8503',3.6);
-        const toolNum=(g(raw,'8516',1151))|0;
-        const errors=[];
-        if(x1===null){errors.push('brak X start (#8510/#8020)');x1=0;}
-        if(y1===null){errors.push('brak Y (#8511/#8021)');y1=0;}
-        if(dep===null){errors.push('brak głęb. (#8512/#8022)');dep=13;}
-        if(x2===null){errors.push('brak X end (#8517)');x2=EL.DL;}
+        const gv2=(k,def=null)=>{
+          const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));
+          if(!m)return def;
+          const val=m[1].replace(',','.');
+          // Resolve dimension variables
+          if(/^l$/i.test(val))return EL.DL;
+          if(/^h$/i.test(val))return EL.DH;
+          if(/^s$/i.test(val))return EL.DS;
+          const v=parseFloat(val);
+          return isNaN(v)?def:v;
+        };
+        let x1=gv2('8510',null)??gv2('8020',null);
+        let y1=gv2('8511',null)??gv2('8021',null);
+        let dep=gv2('8512',null)??gv2('8513',null)??gv2('8022',null);
+        let x2=gv2('8517',null);
+        const w=gv2('8503',3.6);
+        const toolNum=(gv2('8516',1151))|0;
+        if(x1===null)x1=0;
+        if(y1===null)y1=0;
+        if(dep===null)dep=13;
+        if(x2===null)x2=EL.DL;
         dep=Math.abs(dep);
         const isY=Math.abs(x2-x1)<0.01;
         ops.push({ws:wsid,side,type:'blade',
           x:x1,y:y1,x2,y2:y1,orient:isY?'y':'x',
-          z:-dep,width:w,toolNum,
-          errors:errors.length?errors:null});
+          z:-dep,width:w,toolNum,_rawLine:rawLine});
         i++;
 
       } else { i++; }
@@ -489,6 +558,7 @@ function parseTCN(txt){
 }
 
 async function promptNewTools(newMill,newSaw){
+  let changed=false;
   if(newMill.length){
     for(const num of newMill){
       const add=confirm(`Plik zawiera frez #${num} nieznany w ustawieniach.\nCzy dodać go do listy frezów?`);
@@ -497,9 +567,8 @@ async function promptNewTools(newMill,newSaw){
         const dia=parseFloat(diaStr);
         if(!isNaN(dia)&&dia>0){
           toolSettings.millTools.push({num,dia});
-          IDB.set('toolSettings',toolSettings).catch(()=>{});
           showToast(`✓ Dodano frez #${num} ⌀${dia}mm`);
-          buildScene();if(curView!=='3d')draw2D();
+          changed=true;
         }
       }
     }
@@ -508,11 +577,18 @@ async function promptNewTools(newMill,newSaw){
     for(const num of newSaw){
       const add=confirm(`Plik zawiera piłkę #${num} nieznana w ustawieniach.\nCzy dodać numer narzędzia piłki #${num}?`);
       if(add){
-        toolSettings.sawTools.push({num});
-        IDB.set('toolSettings',toolSettings).catch(()=>{});
-        showToast(`✓ Dodano narzędzie piłki #${num}`);
+        const wStr=prompt(`Podaj szerokość rowka piłki #${num} (mm):`, '4');
+        const w=parseFloat(wStr);
+        toolSettings.sawTools.push({num,width:isNaN(w)?4:w});
+        showToast(`✓ Dodano piłkę #${num} w=${isNaN(w)?4:w}mm`);
+        changed=true;
       }
     }
+  }
+  if(changed){
+    await IDB.set('toolSettings',toolSettings);
+    // Refresh everything so new tools appear in selects and 3D/2D
+    renderOps();buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
   }
 }
 
@@ -545,7 +621,9 @@ function fitCamera(){if(!controls)return;const m=Math.max(EL.DL||100,EL.DH||100,
 function toggleXray(){
   xrayMode=!xrayMode;
   document.getElementById('btn-xray').classList.toggle('on',xrayMode);
+  IDB.set('xrayMode',xrayMode).catch(()=>{});
   buildScene();
+  if(curView==='2d')draw2D();
 }
 
 function buildScene(resetCam=false){
@@ -561,6 +639,8 @@ function buildScene(resetCam=false){
     depthWrite:!xrayMode,side:xrayMode?THREE.DoubleSide:THREE.FrontSide
   });
   bGroup.add(new THREE.Mesh(new THREE.BoxGeometry(EL.DL,EL.DS,EL.DH),boardMat));
+  // Edge banding: hatched strips on each banded edge
+  bldEdgeBanding();
   // Board wireframe in xray mode
   if(xrayMode){
     const edges=new THREE.LineSegments(
@@ -581,6 +661,53 @@ function buildScene(resetCam=false){
 
 function isDrillThrough(op){
   return op.type==='drill' && op.side==='TOP' && Math.abs(op.z)>=EL.DS;
+}
+
+function bldEdgeBanding(){
+  if(!EDGE.R&&!EDGE.L&&!EDGE.T&&!EDGE.B)return;
+  const mat=new THREE.LineBasicMaterial({color:0x000000});
+  const hs=12; // spacing between hatch lines
+  const addHatch=(a,b)=>{
+    const geo=new THREE.BufferGeometry().setFromPoints([a,b]);
+    bGroup.add(new THREE.Line(geo,mat));
+  };
+  // Diagonal hatch: draw lines at 45° across each face
+  // Each face: two edge axes (u,v). Hatch goes from (u-step, 0) to (0, v-step)
+  // R face: X=+DL/2, axes: Z (-DH/2..+DH/2), Y (-DS/2..+DS/2)
+  if(EDGE.R){
+    const x=EL.DL/2, zA=-EL.DH/2, zB=EL.DH/2, yA=-EL.DS/2, yB=EL.DS/2;
+    const span=(zB-zA)+(yB-yA);
+    for(let t=0;t<=span;t+=hs){
+      const z0=Math.max(zA,zA+t-(yB-yA)), z1=Math.min(zB,zA+t);
+      const y0=Math.min(yB,yA+(t-(z1-zA))), y1=Math.max(yA,yB-(t-(z0-zA)));
+      addHatch(new THREE.Vector3(x,yA,z0),new THREE.Vector3(x,yB,z1));
+    }
+  }
+  if(EDGE.L){
+    const x=-EL.DL/2, zA=-EL.DH/2, zB=EL.DH/2, yA=-EL.DS/2, yB=EL.DS/2;
+    const span=(zB-zA)+(yB-yA);
+    for(let t=0;t<=span;t+=hs){
+      const z0=Math.max(zA,zA+t-(yB-yA)), z1=Math.min(zB,zA+t);
+      addHatch(new THREE.Vector3(x,yA,z0),new THREE.Vector3(x,yB,z1));
+    }
+  }
+  if(EDGE.T){
+    // T = Z=-DH/2 face, axes: X (-DL/2..+DL/2), Y (-DS/2..+DS/2)
+    const z=-EL.DH/2, xA=-EL.DL/2, xB=EL.DL/2, yA=-EL.DS/2, yB=EL.DS/2;
+    const span=(xB-xA)+(yB-yA);
+    for(let t=0;t<=span;t+=hs){
+      const x0=Math.max(xA,xA+t-(yB-yA)), x1=Math.min(xB,xA+t);
+      addHatch(new THREE.Vector3(x0,yA,z),new THREE.Vector3(x1,yB,z));
+    }
+  }
+  if(EDGE.B){
+    const z=EL.DH/2, xA=-EL.DL/2, xB=EL.DL/2, yA=-EL.DS/2, yB=EL.DS/2;
+    const span=(xB-xA)+(yB-yA);
+    for(let t=0;t<=span;t+=hs){
+      const x0=Math.max(xA,xA+t-(yB-yA)), x1=Math.min(xB,xA+t);
+      addHatch(new THREE.Vector3(x0,yA,z),new THREE.Vector3(x1,yB,z));
+    }
+  }
 }
 
 function bldDrill(op){
@@ -805,22 +932,39 @@ function switchView(v){
   IDB.set('lastView',v).catch(()=>{});
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('act'));
   document.getElementById('tab-'+v).classList.add('act');
-  const hint=document.getElementById('hint'),dimbar=document.getElementById('dimbar');
+  const hint=document.getElementById('hint');
+  const cCode=document.getElementById('c-code');
+  const btnDims=document.getElementById('btn-dims');
+  const btnDia=document.getElementById('btn-dia');
+  const btnDep=document.getElementById('btn-dep');
+  const btnXray=document.getElementById('btn-xray');
+  // Helper to show/hide buttons
+  const show=el=>el&&(el.style.display='');
+  const hide=el=>el&&(el.style.display='none');
   if(v==='3d'){
-    c3d.style.display='block';c2d.style.display='none';
-    dimbar.style.display='none';
-    document.getElementById('xray-bar').style.display='block';
+    c3d.style.display='block';c2d.style.display='none';cCode.style.display='none';
+    hide(btnDims);hide(btnDia);hide(btnDep);show(btnXray);
     hint.textContent='Lewy: obrót · Prawy: przesuw · Scroll: zoom';
+  } else if(v==='code'){
+    c3d.style.display='none';c2d.style.display='none';cCode.style.display='block';
+    hide(btnDims);hide(btnDia);hide(btnDep);hide(btnXray);
+    hint.textContent='';
+    refreshCodeView();
+  } else if(v==='2d'){
+    c3d.style.display='none';c2d.style.display='block';cCode.style.display='none';
+    show(btnDims);show(btnDia);show(btnDep);show(btnXray);
+    hint.textContent='Widok TOP · kliknij aby zaznaczyć';
+    draw2D();
   } else {
-    c3d.style.display='none';c2d.style.display='block';dimbar.style.display='block';
-    document.getElementById('xray-bar').style.display='none';
-    hint.textContent='Widok '+{
-      '2d':'TOP','front':'FRONT','back':'BACK','right':'RIGHT','left':'LEFT'
-    }[v]+' · kliknij aby zaznaczyć';
+    c3d.style.display='none';c2d.style.display='block';cCode.style.display='none';
+    show(btnDims);show(btnDia);show(btnDep);hide(btnXray);
+    hint.textContent='Widok '+{'front':'FRONT','back':'BACK','right':'RIGHT','left':'LEFT'}[v]+' · kliknij aby zaznaczyć';
     draw2D();
   }
 }
-function toggleDims(){showDims=!showDims;document.getElementById('btn-dims').classList.toggle('on',showDims);draw2D();}
+function toggleDims(){showDims=!showDims;document.getElementById('btn-dims').classList.toggle('on',showDims);IDB.set('showDims',showDims).catch(()=>{});draw2D();}
+function toggleDrillDia(){showDrillDia=!showDrillDia;document.getElementById('btn-dia').classList.toggle('on',showDrillDia);IDB.set('showDrillDia',showDrillDia).catch(()=>{});draw2D();}
+function toggleDrillDepth(){showDrillDepth=!showDrillDepth;document.getElementById('btn-dep').classList.toggle('on',showDrillDepth);IDB.set('showDrillDepth',showDrillDepth).catch(()=>{});draw2D();}
 function filterSide(s){
   curFilter=s;
   document.querySelectorAll('.stab').forEach((el,i)=>el.classList.toggle('act',['ALL','TOP','FRONT','RIGHT','BACK','LEFT'][i]===s));
@@ -847,7 +991,7 @@ function openAddForm(type){
   if(!op)return;
   OPS.push(op);
   selectOp(ws,false);
-  renderOps();buildScene();if(curView!=='3d')draw2D();
+  renderOps();buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
   // Scroll new op card into view
   setTimeout(()=>{
     const el=document.querySelector(`.oi[data-ws="${ws}"]`);
@@ -877,7 +1021,7 @@ function brPreviewMill(){
   // Temporarily push, rebuild, then remove
   const tmpWs=nextWs+9999;
   OPS.push({ws:tmpWs,side,type:'mill',x:millPts[0].x,y:millPts[0].y,z:-Math.abs(z),toolNum,pts:[...millPts],_tmp:true});
-  buildScene();if(curView!=='3d')draw2D();
+  buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
   OPS=OPS.filter(o=>!o._tmp);
 }
 function removeMillPt(i){millPts.splice(i,1);renderMillPts();}
@@ -925,6 +1069,11 @@ function deleteOp(ws){
 
 /* ─── SIDEBAR LIST ───────────────────────────────────────────────── */
 /* Build a <select> for tool number from toolSettings */
+function getSawWidth(toolNum){
+  const t=toolSettings.sawTools.find(t=>t.num===toolNum);
+  return t?.width??null; // null = not in settings (show manual field)
+}
+
 function millToolSelect(ws,cur){
   const opts=toolSettings.millTools.map(t=>
     `<option value="${t.num}"${t.num===cur?' selected':''}>#${t.num} ⌀${t.dia}mm</option>`
@@ -934,10 +1083,19 @@ function millToolSelect(ws,cur){
 }
 function sawToolSelect(ws,cur){
   const opts=toolSettings.sawTools.map(t=>
-    `<option value="${t.num}"${t.num===cur?' selected':''}>#${t.num}</option>`
+    `<option value="${t.num}"${t.num===cur?' selected':''}>#${t.num} w=${t.width??4}mm</option>`
   ).join('');
   const fallback=!opts?`<option value="${cur||1151}">#${cur||1151}</option>`:'';
-  return `<select class="oi-sel" onchange="updOp(${ws},'toolNum',this.value)" onclick="event.stopPropagation()">${opts||fallback}</select>`;
+  return `<select class="oi-sel" onchange="onSawToolChange(${ws},this.value)" onclick="event.stopPropagation()">${opts||fallback}</select>`;
+}
+
+function onSawToolChange(ws,val){
+  const op=OPS.find(o=>o.ws===ws);if(!op)return;
+  const num=parseInt(val);
+  op.toolNum=num;
+  const w=getSawWidth(num);
+  if(w!==null)op.width=w; // auto-fill width from tool settings
+  buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
 }
 
 function renderOps(){
@@ -956,35 +1114,34 @@ function renderOps(){
       if(op.type==='drill'){
         badge=`Nawiert ⌀${fv(op.dia)}mm`;
         fields=`
-<div><span class="ol">X (mm)</span><input class="oi-in" type="number" value="${fvI(op.x)}" step="0.1" onchange="updOp(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Średnica (mm)</span><input class="oi-in" type="number" value="${fvI(op.dia)}" step="0.5" onchange="updOp(${op.ws},'dia',this.value)" onclick="event.stopPropagation()"></div>
 <div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Średnica (mm)</span><input class="oi-in" type="number" value="${fvI(op.dia)}" step="0.5" onchange="updOp(${op.ws},'dia',this.value)" onclick="event.stopPropagation()"></div>`;
+<div><span class="ol">X (mm)</span><input class="oi-in" type="number" value="${fvI(op.x)}" step="0.1" onchange="updOp(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>`;
       } else if(op.type==='saw'){
         badge='Piła (saw)';
         fields=`
-<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
+<div><span class="ol">Szerokość (mm)</span><input class="oi-in" type="number" value="${fvI(op.width||3.6)}" step="0.1" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
 <div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Szerokość (mm)</span><input class="oi-in" type="number" value="${fvI(op.width||3.6)}" step="0.1" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>`;
+<div><span class="ol">Y (mm)</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updOp(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>`;
       } else if(op.type==='blade'){
         badge=`Piłka W#1050 (${op.orient==='y'?'⇕':'⇔'})`;
+        const sawW=getSawWidth(op.toolNum);
+        const depField=`<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>`;
         if(op.orient==='x'){
-          // X-cut: horizontal line at constant Y
           fields=`
+<div><span class="ol">Narzędzie #8516</span>${sawToolSelect(op.ws,op.toolNum||1151)}</div>
+${depField}
 <div><span class="ol">X start</span><input class="oi-in" type="number" value="${fvI(op.x)}" step="0.1" onchange="updBlade(${op.ws},'x',this.value)" onclick="event.stopPropagation()"></div>
 <div><span class="ol">X koniec</span><input class="oi-in" type="number" value="${fvI(op.x2??EL.DL)}" step="0.1" onchange="updBlade(${op.ws},'x2',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Y = const</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updBlade(${op.ws},'yconst',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Szerokość rowka</span><input class="oi-in" type="number" value="${fvI(op.width||4)}" step="0.5" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Narzędzie #8516</span>${sawToolSelect(op.ws,op.toolNum||1151)}</div>`;
-          // Y-cut: vertical line at constant X
+<div><span class="ol">Y = const</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updBlade(${op.ws},'yconst',this.value)" onclick="event.stopPropagation()"></div>`;
+        } else {
           fields=`
+<div><span class="ol">Narzędzie #8516</span>${sawToolSelect(op.ws,op.toolNum||1151)}</div>
+${depField}
 <div><span class="ol">X = const</span><input class="oi-in" type="number" value="${fvI(op.x)}" step="0.1" onchange="updBlade(${op.ws},'xconst',this.value)" onclick="event.stopPropagation()"></div>
 <div><span class="ol">Y start</span><input class="oi-in" type="number" value="${fvI(op.y)}" step="0.1" onchange="updBlade(${op.ws},'y',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Y koniec</span><input class="oi-in" type="number" value="${fvI(op.y2??0)}" step="0.1" onchange="updBlade(${op.ws},'y2',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Szerokość rowka</span><input class="oi-in" type="number" value="${fvI(op.width||4)}" step="0.5" onchange="updOp(${op.ws},'width',this.value)" onclick="event.stopPropagation()"></div>
-<div><span class="ol">Narzędzie #8516</span>${sawToolSelect(op.ws,op.toolNum||1151)}</div>`;
+<div><span class="ol">Y koniec</span><input class="oi-in" type="number" value="${fvI(op.y2??0)}" step="0.1" onchange="updBlade(${op.ws},'y2',this.value)" onclick="event.stopPropagation()"></div>`;
         }
       } else if(op.type==='mill'){
         badge=`Frezowanie (${op.pts?.length||0} pkt)`;
@@ -995,8 +1152,8 @@ function renderOps(){
           <button class="pt-del" onclick="event.stopPropagation();delMillPt(${op.ws},${i})">✕</button>
         </div>`).join('');
         fields=`
-<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
 <div><span class="ol">Narzędzie #205</span>${millToolSelect(op.ws,op.toolNum||1200)}</div>
+<div><span class="ol">Głębokość (mm)</span><input class="oi-in" type="number" value="${fvI(Math.abs(op.z))}" step="0.5" onchange="updOp(${op.ws},'z',this.value)" onclick="event.stopPropagation()"></div>
 <div style="grid-column:1/-1">
   <span class="ol">Wierzchołki</span>
   <div class="pts-list">${ptsHtml}</div>
@@ -1030,14 +1187,14 @@ function updMillPt(ws,i,field,val){
   const op=OPS.find(o=>o.ws===ws);if(!op||!op.pts||!op.pts[i])return;
   op.pts[i][field]=parseFloat(val)||0;
   if(i===0){op.x=op.pts[0].x;op.y=op.pts[0].y;}
-  buildScene();if(curView!=='3d')draw2D();
+  buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
 }
 function delMillPt(ws,i){
   const op=OPS.find(o=>o.ws===ws);if(!op||!op.pts)return;
   op.pts.splice(i,1);
   if(op.pts.length>0){op.x=op.pts[0].x;op.y=op.pts[0].y;}
   _refreshMillPtsList(ws);
-  buildScene();if(curView!=='3d')draw2D();
+  buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
 }
 function addMillPtToOp(ws){
   const op=OPS.find(o=>o.ws===ws);if(!op)return;
@@ -1051,7 +1208,7 @@ function addMillPtToOp(ws){
   if(xi)xi.value=x;
   if(yi)yi.value=y;
   _refreshMillPtsList(ws);
-  buildScene();if(curView!=='3d')draw2D();
+  buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
 }
 /* Refresh only the pts-list div of one mill op without rebuilding the whole sidebar */
 function _refreshMillPtsList(ws){
@@ -1082,7 +1239,7 @@ function updBlade(ws,field,val){
   if(field==='yconst'){op.y=v;op.y2=v;}
   else if(field==='xconst'){op.x=v;op.x2=v;}
   else op[field]=v;
-  buildScene();if(curView!=='3d')draw2D();
+  buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
 }
 
 function updOp(ws,field,val){
@@ -1093,7 +1250,7 @@ function updOp(ws,field,val){
   else if(field==='toolNum')op.toolNum=parseInt(val)||op.toolNum;
   else op[field]=v;
   // Only rebuild visuals, not sidebar (avoids losing input focus during live edit)
-  buildScene();if(curView!=='3d')draw2D();
+  buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
   // Update cnt-lbl silently
   document.getElementById('cnt-lbl').textContent=`${OPS.length} operacji`;
 }
@@ -1115,16 +1272,110 @@ function changeLabelFont(delta){
 
 function newFile(){
   OPS=[];selWs=null;fileHandle=null;fileDecSep='.';nextWs=1;
+  EDGE={R:null,L:null,T:null,B:null};
   EL.DL=600;EL.DH=400;EL.DS=18;
   document.getElementById('ed-dl').value=EL.DL;
   document.getElementById('ed-dh').value=EL.DH;
   document.getElementById('ed-ds').value=EL.DS;
   fileName='nowy_element.TCN';
   setLoadedState(true,fileName);
-  renderOps();buildScene(true);if(curView!=='3d')draw2D();
+  renderOps();renderEdgeInfo();buildScene(true);if(curView!=='3d')draw2D();
   // Focus first dimension input so user can immediately change size
   setTimeout(()=>document.getElementById('ed-dl').focus(),80);
   showToast('✓ Nowy element – wpisz wymiary');
+}
+
+function renderEdgeInfo(){
+  const box=document.getElementById('edge-box');
+  const info=document.getElementById('edge-info');
+  box.style.display=LOADED?'':'none';
+  const edgeLabel={R:'Prawa (R)',L:'Lewa (L)',T:'Przód (T)',B:'Tył (B)'};
+  info.innerHTML=`<div style="display:grid;grid-template-columns:auto 1fr auto;gap:6px 8px;align-items:center;font-size:var(--txs)">
+  ${['R','L','T','B'].map(k=>{
+    const has=!!EDGE[k];
+    const dot=`<span style="width:10px;height:10px;border-radius:2px;background:${has?'#f59e0b':'var(--surfoff)'};border:1px solid var(--bord);display:inline-block;cursor:pointer" onclick="toggleEdge('${k}')" title="Kliknij by przełączyć"></span>`;
+    const nameSpan=`<span style="color:${has?'var(--txt)':'var(--faint)'}">${edgeLabel[k]}</span>`;
+    const displayName=EDGE[k]||_edgeNames[k]||'';
+    const inp=`<input type="text" value="${displayName}"
+      style="background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:3px 6px;font-size:var(--txs);color:${EDGE[k]?'var(--txt)':'var(--faint)'};width:100%;opacity:${EDGE[k]?1:0.6}"
+      onchange="setEdge('${k}',this.value)" onclick="event.stopPropagation()">`;
+    return `${dot}${nameSpan}${inp}`;
+  }).join('')}
+</div>`;
+}
+
+function refreshCodeView(){
+  const pre=document.getElementById('code-content');
+  if(!pre)return;
+  if(!LOADED){pre.textContent='/* Brak wczytanego pliku */';return;}
+  // Build TCN text bypassing error validation (show content regardless)
+  try{
+    // Temporarily allow errored ops through by clearing their errors
+    const saved=OPS.map(o=>o.errors);
+    OPS.forEach(o=>delete o.errors);
+    pre.textContent=buildTCNText();
+    OPS.forEach((o,i)=>{ if(saved[i]) o.errors=saved[i]; });
+  }catch(e){
+    pre.textContent='/* Błąd generowania: '+e.message+' */';
+  }
+}
+
+function toggleEdge(k){
+  if(EDGE[k]){_edgeNames[k]=EDGE[k];EDGE[k]=null;}
+  else EDGE[k]=_edgeNames[k]||'Okleina PCV';
+  renderEdgeInfo();buildScene();
+  if(curView==='2d')draw2D();else if(curView==='code')refreshCodeView();
+}
+function setEdge(k,v){
+  const val=v.trim()||null;
+  EDGE[k]=val;
+  if(val)_edgeNames[k]=val; // remember for next toggle
+  buildScene();
+  if(curView==='2d')draw2D();else if(curView==='code')refreshCodeView();
+}
+
+function rotate180(){
+  if(!LOADED)return;
+  // 180° = mirror both X (DL-x) and Y (DH-y) for TOP ops
+  // Side walls: X stays (DL-x), Y stays (DH-y); FRONT↔BACK, LEFT↔RIGHT
+  OPS.forEach(op=>{
+    if(op.side==='TOP'){
+      if(op.type==='drill'||op.type==='saw'){
+        op.x=EL.DL-op.x; op.y=EL.DH-op.y;
+      } else if(op.type==='blade'){
+        // Mirror X: new_x=DL-old_x2, new_x2=DL-old_x; Y mirrors
+        const nx=EL.DL-(op.x2??op.x), nx2=EL.DL-op.x;
+        op.x=Math.min(nx,nx2); op.x2=Math.max(nx,nx2);
+        op.y=EL.DH-op.y; op.y2=EL.DH-op.y;
+      } else if(op.type==='mill'&&op.pts){
+        op.pts=op.pts.map(p=>({x:EL.DL-p.x, y:EL.DH-p.y}));
+        op.x=op.pts[0]?.x??0; op.y=op.pts[0]?.y??0;
+      }
+    } else {
+      // Side walls: mirror X coord (DL-x for FRONT/BACK, DH-x for LEFT/RIGHT)
+      // Also swap FRONT↔BACK and LEFT↔RIGHT
+      const faceW={FRONT:EL.DL,BACK:EL.DL,RIGHT:EL.DH,LEFT:EL.DH};
+      const w=faceW[op.side]||EL.DL;
+      const mx=x=>w-x;
+      if(op.type==='drill'||op.type==='saw'){op.x=mx(op.x);}
+      else if(op.type==='blade'){
+        const nx=mx(op.x2??op.x), nx2=mx(op.x);
+        op.x=Math.min(nx,nx2); op.x2=Math.max(nx,nx2);
+      } else if(op.type==='mill'&&op.pts){
+        op.pts=op.pts.map(p=>({x:mx(p.x),y:p.y}));
+        op.x=op.pts[0]?.x??0;
+      }
+      // Swap FRONT↔BACK and LEFT↔RIGHT
+      const swap={FRONT:'BACK',BACK:'FRONT',LEFT:'RIGHT',RIGHT:'LEFT'};
+      if(swap[op.side])op.side=swap[op.side];
+    }
+  });
+  // Edge banding: R↔L, T↔B
+  const {R,L,T,B}=EDGE;
+  EDGE.R=L; EDGE.L=R; EDGE.T=B; EDGE.B=T;
+  renderEdgeInfo();
+  renderOps();buildScene(true);if(curView!=='3d')draw2D();if(curView==='code')refreshCodeView();
+  showToast('✓ Obrócono 180°');
 }
 
 function updateEL(){
@@ -1132,7 +1383,7 @@ function updateEL(){
   EL.DH=parseFloat(document.getElementById('ed-dh').value)||0;
   EL.DS=parseFloat(document.getElementById('ed-ds').value)||0;
   document.getElementById('dim-lbl').textContent=LOADED?`${EL.DL} × ${EL.DH} × ${EL.DS} mm`:'Brak pliku';
-  buildScene();if(curView!=='3d')draw2D();
+  buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
 }
 
 /* ─── 2D VIEW ─────────────────────────────────────────────────────── */
@@ -1165,13 +1416,17 @@ function draw2D(){
   const sOps=OPS.filter(o=>o.side===cfg.side);
   const drills=sOps.filter(o=>o.type==='drill');
 
-  // dimStep must be wide enough to fit the rotated label text (labelFontSize = text width when rotated 90°)
-  const dimStep=Math.max(22, labelFontSize+8), dimInit=40;
+  const dimStep=Math.max(22, labelFontSize+8), dimInit=16; // hole dims start close
   const uXc=showDims&&drills.length?new Set(drills.map(o=>o.x)).size:0;
   const uYc=showDims&&drills.length?new Set(drills.map(o=>o.y)).size:0;
-  const padL=80,padT=55;
-  const padR=70+(uYc>0?dimInit+20+(uYc-1)*dimStep+20:0);
-  const padB=78+(uXc>0?dimInit+20+(uXc-1)*dimStep+16:0);
+  // Space for hole dims + one more slot for main board dim
+  const holeSlotsH=uXc>0?uXc:0;
+  const holeSlotsV=uYc>0?uYc:0;
+  const mainSlotH=holeSlotsH; // same step spacing as hole dims (immediately after last)
+  const mainSlotV=holeSlotsV;
+  const padL=80, padT=86; // padT accounts for vtabs bar + top-bar buttons (~80px)
+  const padR=70+(mainSlotV>0?dimInit+20+(mainSlotV)*dimStep+28:28);
+  const padB=78+(mainSlotH>0?dimInit+20+(mainSlotH)*dimStep+24:24);
 
   const sc=Math.min((W-padL-padR)/Math.max(1,cfg.w),(H-padT-padB)/Math.max(1,cfg.h));
   const ox=(W-padL-padR-cfg.w*sc)/2+padL,oy=(H-padT-padB-cfg.h*sc)/2+padT;
@@ -1184,15 +1439,46 @@ function draw2D(){
   ctx.fillRect(tx(0),ty(cfg.h),cfg.w*sc,cfg.h*sc);
   ctx.strokeStyle=d?'#4f98a3':'#01696f';ctx.lineWidth=2;
   ctx.strokeRect(tx(0),ty(cfg.h),cfg.w*sc,cfg.h*sc);
-  ctx.fillStyle=d?'#797876':'#7a7974';ctx.font='bold 12px Satoshi,sans-serif';ctx.textAlign='left';
-  ctx.fillText(cfg.label,tx(0),ty(cfg.h)-10);
 
   if(showDims){
     const mc=d?'#4f98a3':'#01696f',mt=d?'#cdccca':'#28251d';
-    // Main H-dim below board (below ty(0) = canvas bottom of board)
-    drawDimH(tx(0),tx(cfg.w),ty(0)+22,`${cfg.w} mm`,mc,mt);
-    // Main V-dim right of board (from ty(cfg.h)=top to ty(0)=bottom)
-    drawDimV(tx(cfg.w)+22,ty(cfg.h),ty(0),`${cfg.h} mm`,mc,mt);
+    const mainHy=ty(0)+dimInit+20+mainSlotH*dimStep;
+    const mainVx=tx(cfg.w)+dimInit+20+mainSlotV*dimStep;
+    drawDimH(tx(0),tx(cfg.w),mainHy,`${cfg.w} mm`,mc,mt);
+    drawDimV(mainVx,ty(cfg.h),ty(0),`${cfg.h} mm`,mc,mt);
+  }
+
+  // Edge banding strips drawn OUTSIDE the board — gap = strip width so they're clearly separate
+  if(curView==='2d'&&(EDGE.R||EDGE.L||EDGE.T||EDGE.B)){
+    const ew=Math.max(5,Math.min(12,sc*2.5));
+    const ec='#f59e0b';
+    const gap=ew; // gap = one full strip width for clear separation
+    ctx.globalAlpha=0.85;ctx.fillStyle=ec;
+    if(EDGE.R)ctx.fillRect(tx(cfg.w)+gap,ty(cfg.h),ew,cfg.h*sc);
+    if(EDGE.L)ctx.fillRect(tx(0)-ew-gap,ty(cfg.h),ew,cfg.h*sc);
+    if(EDGE.T)ctx.fillRect(tx(0),ty(cfg.h)-ew-gap,cfg.w*sc,ew);
+    if(EDGE.B)ctx.fillRect(tx(0),ty(0)+gap,cfg.w*sc,ew);
+    ctx.globalAlpha=1;
+    const lfs=Math.max(9,labelFontSize);
+    ctx.font=`bold ${lfs}px Satoshi,sans-serif`;ctx.fillStyle=ec;
+    if(EDGE.R){
+      ctx.save();ctx.textAlign='center';
+      ctx.translate(tx(cfg.w)+gap+ew+4+lfs/2,(ty(cfg.h)+ty(0))/2);
+      ctx.rotate(Math.PI/2);ctx.fillText(EDGE.R,0,0);ctx.restore();
+    }
+    if(EDGE.L){
+      ctx.save();ctx.textAlign='center';
+      ctx.translate(tx(0)-gap-ew-4-lfs/2,(ty(cfg.h)+ty(0))/2);
+      ctx.rotate(-Math.PI/2);ctx.fillText(EDGE.L,0,0);ctx.restore();
+    }
+    if(EDGE.T){
+      ctx.textAlign='center';
+      ctx.fillText(EDGE.T,(tx(0)+tx(cfg.w))/2,ty(cfg.h)-gap-ew-5);
+    }
+    if(EDGE.B){
+      ctx.textAlign='center';
+      ctx.fillText(EDGE.B,(tx(0)+tx(cfg.w))/2,ty(0)+gap+ew+lfs+3);
+    }
   }
 
   sOps.forEach(op=>{
@@ -1212,8 +1498,11 @@ function draw2D(){
       ctx.beginPath();ctx.moveTo(cx-r*1.5,cy);ctx.lineTo(cx+r*1.5,cy);ctx.stroke();
       ctx.beginPath();ctx.moveTo(cx,cy-r*1.5);ctx.lineTo(cx,cy+r*1.5);ctx.stroke();
       ctx.restore();
-      ctx.fillStyle=sel?opc('sel'):opc(dkey);ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
-      ctx.fillText(`⌀${fv(op.dia)} ↓${fv(Math.abs(op.z))}${through?' ⇣':''}`,cx,cy+r+labelFontSize+2);
+      ctx.fillStyle=sel?opc('sel'):'#000000';ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
+      const lparts=[];
+      if(showDrillDia)lparts.push(`⌀${fv(op.dia)}`);
+      if(showDrillDepth)lparts.push(`↓${fv(Math.abs(op.z))}${through?' ⇣':''}`);
+      if(lparts.length)ctx.fillText(lparts.join(' '),cx,cy+r+labelFontSize+2);
 
     } else if(op.type==='saw'&&curView==='2d'){
       const lx=tx(20),ly=ty(op.y),lw=(cfg.w-40)*sc,lh=Math.max(2,-(op.width||3.6)*sc);
@@ -1233,8 +1522,11 @@ function draw2D(){
       ctx.beginPath();ctx.moveTo(x1c,y1c);ctx.lineTo(x2c,y2c);ctx.stroke();
       ctx.globalAlpha=1;ctx.lineWidth=2;
       ctx.beginPath();ctx.moveTo(x1c,y1c);ctx.lineTo(x2c,y2c);ctx.stroke();
-      ctx.fillStyle=bc;ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
-      ctx.fillText(`piłka w=${fv(op.width)} ↓${fv(Math.abs(op.z))}`,(x1c+x2c)/2,Math.min(y1c,y2c)-6);
+      ctx.fillStyle='#000000';ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
+      const blParts=[];
+      if(showDrillDia)blParts.push(`piłka #${op.toolNum||1151} w=${fv(op.width)}`);
+      if(showDrillDepth)blParts.push(`↓${fv(Math.abs(op.z))}`);
+      if(blParts.length)ctx.fillText(blParts.join(' '),(x1c+x2c)/2,Math.min(y1c,y2c)-6);
       ctx.restore();
 
     } else if(op.type==='mill'&&op.pts?.length>=2){
@@ -1258,11 +1550,67 @@ function draw2D(){
       op.pts.forEach(p=>{ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),3,0,Math.PI*2);ctx.fill();});
       const cxm=op.pts.reduce((a,p)=>a+p.x,0)/op.pts.length;
       const cym=op.pts.reduce((a,p)=>a+p.y,0)/op.pts.length;
-      ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
-      ctx.fillText(`frez #${op.toolNum||1200}${millDia?` ⌀${fv(millDia)}`:''} ↓${fv(Math.abs(op.z))}`,tx(cxm),ty(cym)-9);
+      ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';ctx.fillStyle='#000000';
+      const millParts=[];
+      if(showDrillDia)millParts.push(`frez #${op.toolNum||1200}`+(millDia?` ⌀${fv(millDia)}`:''));
+      if(showDrillDepth)millParts.push(`↓${fv(Math.abs(op.z))}`);
+      if(millParts.length)ctx.fillText(millParts.join(' '),tx(cxm),ty(cym)-9);
       ctx.restore();
     }
   });
+
+  // Xray overlay on TOP view: show drills from side walls as rectangles from edge inward
+  if(xrayMode&&curView==='2d'){
+    const sideDrills=OPS.filter(o=>o.type==='drill'&&o.side!=='TOP');
+    sideDrills.forEach(op=>{
+      const dep=Math.abs(op.z);
+      const dia=op.dia||8;
+      const halfD=dia/2*sc;
+      const depPx=dep*sc;
+      ctx.save();
+      ctx.globalAlpha=0.45;
+      ctx.fillStyle=d?'#3b82f6':'#2563eb';
+      ctx.strokeStyle=d?'#3b82f6':'#2563eb';
+      ctx.lineWidth=1;
+      let rx,ry,rw,rh,lx,ly,rot=0;
+      if(op.side==='FRONT'){
+        const cx=tx(op.x);
+        rx=cx-halfD; ry=ty(0); rw=dia*sc; rh=depPx;
+        ctx.fillRect(rx,ry,rw,rh);ctx.strokeRect(rx,ry,rw,rh);
+        lx=cx; ly=ry+depPx+labelFontSize+2;
+      } else if(op.side==='BACK'){
+        const cx=tx(op.x);
+        rx=cx-halfD; ry=ty(cfg.h)-depPx; rw=dia*sc; rh=depPx;
+        ctx.fillRect(rx,ry,rw,rh);ctx.strokeRect(rx,ry,rw,rh);
+        lx=cx; ly=ry-4;
+      } else if(op.side==='RIGHT'){
+        const cy=ty(op.x);
+        rx=tx(cfg.w)-depPx; ry=cy-halfD; rw=depPx; rh=dia*sc;
+        ctx.fillRect(rx,ry,rw,rh);ctx.strokeRect(rx,ry,rw,rh);
+        lx=rx-4; ly=cy; rot=-Math.PI/2;
+      } else if(op.side==='LEFT'){
+        const cy=ty(op.x);
+        rx=tx(0); ry=cy-halfD; rw=depPx; rh=dia*sc;
+        ctx.fillRect(rx,ry,rw,rh);ctx.strokeRect(rx,ry,rw,rh);
+        lx=rx+rw+4; ly=cy; rot=Math.PI/2;
+      }
+      // Label: dia and/or depth
+      if(lx!==undefined){
+        ctx.globalAlpha=1;
+        ctx.fillStyle='#000000';
+        ctx.font=`${labelFontSize}px Satoshi,sans-serif`;
+        ctx.textAlign='center';
+        const lparts=[];
+        if(showDrillDia)lparts.push(`⌀${fv(dia)}`);
+        if(showDrillDepth)lparts.push(`↓${fv(dep)}`);
+        if(lparts.length){
+          if(rot){ctx.save();ctx.translate(lx,ly);ctx.rotate(rot);ctx.fillText(lparts.join(' '),0,0);ctx.restore();}
+          else ctx.fillText(lparts.join(' '),lx,ly);
+        }
+      }
+      ctx.restore();
+    });
+  }
 
   if(showDims&&drills.length)drawHoleDims(cfg,drills,tx,ty,d,dimInit,dimStep);
 
@@ -1358,6 +1706,10 @@ function drawDimV(x,y1,y2,lbl,col,tcol){
   ctx.fillStyle=tcol;ctx.font=`${labelFontSize}px Satoshi,sans-serif`;ctx.textAlign='center';
   // Always offset by half font-size + 4px so text clears the line at any font size
   ctx.save();ctx.translate(x+Math.ceil(labelFontSize/2)-2,(y1+y2)/2);ctx.rotate(Math.PI/2);ctx.fillText(lbl,0,0);ctx.restore();ctx.restore();
+}
+function drawEdgeLabel(col,x,y,txt,pos){
+  ctx.save();ctx.fillStyle=col;ctx.font=`bold ${Math.max(8,labelFontSize-1)}px Satoshi,sans-serif`;ctx.textAlign='center';
+  ctx.fillText(txt,x,y);ctx.restore();
 }
 function tickV(x,y){ctx.beginPath();ctx.moveTo(x,y-6);ctx.lineTo(x,y+6);ctx.stroke();}
 function tickH(x,y){ctx.beginPath();ctx.moveTo(x-6,y);ctx.lineTo(x+6,y);ctx.stroke();}
@@ -1458,6 +1810,10 @@ function rotate90CW(){
     }
   });
   EL.DL=oH;EL.DH=oL;
+  // Rotate edge banding: 90° CW → R→B, B→L, L→T, T→R
+  const {R,L,T,B}=EDGE;
+  EDGE.R=T; EDGE.T=L; EDGE.L=B; EDGE.B=R;
+  renderEdgeInfo();
   // Post-rotation label correction: swap FRONT↔BACK and LEFT↔RIGHT
   // Simultaneously mirror #1 (x) for ops that land on FRONT or LEFT
   const finalSwap={FRONT:'BACK',BACK:'FRONT',LEFT:'RIGHT',RIGHT:'LEFT'};
@@ -1496,42 +1852,166 @@ function fmtTCN(v){
   return fileDecSep===',' ? s.replace('.',',') : s;
 }
 
+/* ─── RAW-PRESERVING PARAM SUBSTITUTION ─────────────────────────── */
+function rawSetParam(line,param,value){
+  const re=new RegExp('(#'+param+'=)[^\\s}]+');
+  if(re.test(line))return line.replace(re,'$1'+value);
+  return line.replace(/\s*\}W$/,' #'+param+'='+value+' }W');
+}
+
 function buildTCNText(){
   const errOps=OPS.filter(o=>o.errors&&o.errors.length);
   if(errOps.length){
     const names=errOps.map(o=>`WS=${o.ws} (${o.type})`).join(', ');
     throw new Error(`Plik zawiera operacje z błędami: ${names}.\nUzupełnij lub usuń je przed zapisaniem.`);
   }
-  // Deduplicate drills (same side+x+y+z+dia)
-  const seen=new Set();
-  const ops=OPS.filter(op=>{
-    if(op.type!=='drill')return true;
-    const key=`${op.side}|${op.x}|${op.y}|${op.z}|${op.dia}`;
-    if(seen.has(key))return false;seen.add(key);return true;
+  const n=fmtTCN;
+  return _rawTCN ? buildTCNRaw(n) : buildTCNGenerated(n);
+}
+
+function buildTCNRaw(n){
+  const lines=[];
+  // 1. Header verbatim, updated ::UNm and SPEC
+  let header=_rawHeader;
+  header=header.replace(/(::UNm\s+DL=)[^\s]+(\s+DH=)[^\s]+(\s+DS=)[^\s]+/i,
+    `$1${n(EL.DL)}$2${n(EL.DH)}$3${n(EL.DS)}`);
+  const hasEdge=EDGE.R||EDGE.L||EDGE.T||EDGE.B;
+  const edgeBlock=()=>{
+    const ep=(k)=>EDGE[k]?` EDGE${k}=${EDGE[k]}`:'';
+    return `SPEC{\n::${ep('R')}${ep('L')}${ep('T')}${ep('B')} GRAIN=%;0 NEST=%;0 SIDEPREV=%;0 GRADD=%;0 ATTR=%;0 USE=%;0\n}SPEC`;
+  };
+  if(header.match(/SPEC\{[\s\S]*?\}SPEC/))
+    header=header.replace(/SPEC\{[\s\S]*?\}SPEC/,hasEdge?edgeBlock():'SPEC{\n}SPEC');
+  else if(hasEdge) header+=edgeBlock()+'\n';
+  lines.push(header.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trimEnd());
+
+  // 2. Rebuild SIDE blocks preserving original structure
+  const sideByLabel={'top':'TOP','bottom':'BOTTOM','front':'FRONT','rear':'BACK','back':'BACK','right':'RIGHT','left':'LEFT'};
+  const sideMapNum={1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  const sideNumForName={TOP:1,BOTTOM:2,FRONT:3,RIGHT:4,BACK:5,LEFT:6};
+  const opsBySide={};
+  OPS.forEach(o=>{if(!opsBySide[o.side])opsBySide[o.side]=[];opsBySide[o.side].push(o);});
+
+  const origSideRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
+  const origSides=[];let osm;
+  while((osm=origSideRe.exec(_rawTCN))){
+    const num=parseInt(osm[1]);
+    let name=sideMapNum[num]||`SIDE${num}`;
+    const lm=osm[2].match(/\$=(\w+)/);
+    if(lm){const lk=lm[1].toLowerCase();if(sideByLabel[lk])name=sideByLabel[lk];}
+    origSides.push({num,name,body:osm[2]});
+  }
+
+  const handledSides=new Set();
+  origSides.forEach(({num,name,body})=>{
+    handledSides.add(name);
+    const sideOps=opsBySide[name]||[];
+    lines.push(`SIDE#${num}{`);
+    body.split(/\r?\n/).forEach(ln=>{const l=ln.trim();if(l&&!l.startsWith('W#'))lines.push(l);});
+    sideOps.forEach(o=>lines.push(buildRawOpLine(o,n)));
+    lines.push('}SIDE');
   });
-  const n=fmtTCN; // shorthand
+  // New sides not in original
+  Object.entries(opsBySide).forEach(([sideName,sideOps])=>{
+    if(handledSides.has(sideName))return;
+    const num=sideNumForName[sideName]||99;
+    lines.push(`SIDE#${num}{`);lines.push(`$=${sideName}`);
+    sideOps.forEach(o=>lines.push(buildRawOpLine(o,n)));
+    lines.push('}SIDE');
+  });
+  return lines.join('\r\n');
+}
+
+function buildRawOpLine(o,n){
+  if(o.type==='drill'){
+    let rl=o._rawLine;
+    if(!rl){
+      // Find a template from an existing drill in the file to preserve structure
+      const tmpl=OPS.find(op=>op.type==='drill'&&op._rawLine);
+      if(tmpl){
+        // Clone template, set new WS, zero out edited params (will be set by rawSetParam below)
+        rl=tmpl._rawLine
+          .replace(/WS=\d+/,`WS=${o.ws}`)
+          .replace(/(#1=)[^\s}]+/g,`$10`)
+          .replace(/(#2=)[^\s}]+/g,`$10`)
+          .replace(/(#3=)[^\s}]+/g,`$10`)
+          .replace(/(#1002=)[^\s}]+/g,`$10`);
+      } else {
+        rl=`W#81{ ::WTp WS=${o.ws}  #8015=0 #1=0 #2=0 #3=0 #1002=0 #201=1 #203=1 #1001=0 }W`;
+      }
+    }
+    rl=rawSetParam(rl,'1',n(o.x));rl=rawSetParam(rl,'2',n(o.y));
+    rl=rawSetParam(rl,'3',n(o.z));rl=rawSetParam(rl,'1002',n(o.dia));
+    return rl;
+  }
+  if(o.type==='saw'){
+    let rl=o._rawLine||`W#89{ WS=${o.ws} #1=${n(o.x)} #2=${n(o.y)} #3=${n(o.z)} #1001=${n(o.width||3.6)} }W`;
+    rl=rawSetParam(rl,'1',n(o.x));rl=rawSetParam(rl,'2',n(o.y));
+    rl=rawSetParam(rl,'3',n(o.z));rl=rawSetParam(rl,'1001',n(o.width||3.6));
+    return rl;
+  }
+  if(o.type==='mill'&&o.pts?.length>=2){
+    let rl=o._rawLine;
+    if(!rl){
+      const tmpl=OPS.find(op=>op.type==='mill'&&op._rawLine);
+      if(tmpl){
+        rl=tmpl._rawLine.replace(/WS=\d+/,`WS=${o.ws}`);
+      } else {
+        rl=`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=0 #2=0 #3=0 #201=1 #203=1 #205=0 #1001=1 #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 #8180=0 #8181=0 #8185=0 #8186=0 }W`;
+      }
+    }
+    rl=rawSetParam(rl,'1',n(o.pts[0].x));rl=rawSetParam(rl,'2',n(o.pts[0].y));
+    rl=rawSetParam(rl,'3',n(o.z));rl=rawSetParam(rl,'205',o.toolNum||1200);
+    const all=[rl];
+    o.pts.slice(1).forEach((p,i)=>{
+      let rl2=(o._raw2201&&o._raw2201[i]);
+      if(!rl2){
+        // Try template from another mill's 2201
+        const tmpl2=OPS.find(op=>op.type==='mill'&&op._raw2201?.length);
+        rl2=(tmpl2?._raw2201[0])||`W#2201{ ::WTl  #8015=0 #1=0 #2=0 #3=0 #42=0 #49=0 }W`;
+      }
+      rl2=rawSetParam(rl2,'1',n(p.x));rl2=rawSetParam(rl2,'2',n(p.y));rl2=rawSetParam(rl2,'3',n(o.z));
+      all.push(rl2);
+    });
+    return all.join('\r\n');
+  }
+  if(o.type==='blade'){
+    let rl=o._rawLine;
+    if(!rl){
+      const tmpl=OPS.find(op=>op.type==='blade'&&op._rawLine);
+      if(tmpl){
+        rl=tmpl._rawLine.replace(/WS=\d+/,`WS=${o.ws}`);
+      } else {
+        rl=`W#1050{ ::WT2 WS=${o.ws}  #8098=..\\custom\\mcr\\lame.tmcr #6=1 #8015=0 #8503=0 #8509=0 #8510=0 #8511=0 #8512=0 #8513=0 #8514=1 #8515=1 #8516=0 #8517=0 #8525=2 #8526=0 #8527=1 }W`;
+      }
+    }
+    const x2=o.orient==='y'?o.x:(o.x2??o.x);
+    if(/#8510=[\d.,\-]+/.test(rl))rl=rawSetParam(rl,'8510',n(o.x));
+    if(/#8511=[\d.,\-]+/.test(rl))rl=rawSetParam(rl,'8511',n(o.y));
+    if(/#8512=[\d.,\-]+/.test(rl))rl=rawSetParam(rl,'8512',n(o.z));
+    if(/#8513=[\d.,\-]+/.test(rl))rl=rawSetParam(rl,'8513',n(o.z));
+    if(/#8517=[\d.,\-]+/.test(rl))rl=rawSetParam(rl,'8517',n(x2));
+    if(/#8503=[\d.,\-]+/.test(rl))rl=rawSetParam(rl,'8503',n(o.width||3.6));
+    if(/#8516=[\d.,\-]+/.test(rl))rl=rawSetParam(rl,'8516',o.toolNum||1151);
+    return rl;
+  }
+  return '';
+}
+
+function buildTCNGenerated(n){
   const sN={TOP:1,FRONT:3,RIGHT:4,BACK:5,LEFT:6};
   const sO=['TOP','FRONT','RIGHT','BACK','LEFT'];
-  const lines=[];
-  lines.push('TPA\\ALBATROS\\EDICAD\\02.00:1333:r0w0h0s4');
-  lines.push('::SIDE=1;3;4;5;6;');
-  lines.push(`::UNm DL=${n(EL.DL)} DH=${n(EL.DH)} DS=${n(EL.DS)}`);
-  lines.push("'tcn version=2.4.14");lines.push("'code=ansi");
-  lines.push('SIDE#0{');lines.push('}SIDE');
+  const lines=['TPA\\ALBATROS\\EDICAD\\02.00:1333:r0w0h0s4','::SIDE=1;3;4;5;6;',
+    `::UNm DL=${n(EL.DL)} DH=${n(EL.DH)} DS=${n(EL.DS)}`];
+  if(EDGE.R||EDGE.L||EDGE.T||EDGE.B){
+    const ep=(k)=>EDGE[k]?` EDGE${k}=${EDGE[k]}`:'';
+    lines.push('SPEC{',`::${ep('R')}${ep('L')}${ep('T')}${ep('B')} GRAIN=%;0 NEST=%;0 SIDEPREV=%;0 GRADD=%;0 ATTR=%;0 USE=%;0`,'}SPEC');
+  }
+  lines.push("'tcn version=2.4.14","'code=ansi",'SIDE#0{','}SIDE');
   sO.forEach(side=>{
-    lines.push(`SIDE#${sN[side]}{`);lines.push(`$=${side}`);
-    ops.filter(o=>o.side===side).forEach(o=>{
-      if(o.type==='drill')
-        lines.push(`W#81{ ::WTp WS=${o.ws}  #8015=0 #1=${n(o.x)} #2=${n(o.y)} #3=${n(o.z)} #1002=${n(o.dia)} #201=1 #203=1 #1001=0 }W`);
-      else if(o.type==='saw')
-        lines.push(`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=${n(o.x)} #2=${n(o.y)} #3=${n(o.z)} #201=1 #203=1 #205=1200 #1001=${n(o.width||3.6)} #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 }W`);
-      else if(o.type==='mill'&&o.pts?.length>=2){
-        lines.push(`W#89{ ::WTs WS=${o.ws}  #8015=0 #1=${n(o.pts[0].x)} #2=${n(o.pts[0].y)} #3=${n(o.z)} #201=1 #203=1 #205=${o.toolNum||1200} #1001=1 #9521=0 #8101=0 #8096=0 #40=0 #46=1 #8135=0 #8136=0 #8180=0 #8181=0 #8185=0 #8186=0 }W`);
-        o.pts.slice(1).forEach(p=>lines.push(`W#2201{ ::WTl  #8015=0 #1=${n(p.x)} #2=${n(p.y)} #3=${n(o.z)} #42=0 #49=0 }W`));
-      } else if(o.type==='blade'){
-        const x1=o.x,y1=o.y,x2=o.orient==='y'?o.x:o.x2??x1;
-        lines.push(`W#1050{ ::WT2 WS=${o.ws}  #8098=..\\custom\\mcr\\lame.tmcr #6=1 #8015=0 #8503=${n(o.width||4)} #8509=0 #8510=${n(x1)} #8511=${n(y1)} #8512=${n(o.z)} #8513=${n(o.z)} #8514=1 #8515=1 #8516=${o.toolNum||1151} #8517=${n(x2)} #8525=2 #8526=0 #8527=1 }W`);
-      }
+    lines.push(`SIDE#${sN[side]}{`,`$=${side}`);
+    OPS.filter(o=>o.side===side).forEach(o=>{
+      const l=buildRawOpLine(o,n);if(l)lines.push(l);
     });
     lines.push('}SIDE');
   });
@@ -1591,17 +2071,23 @@ function downloadTCN(txt,name){
 /* Invalidate cached thumbnail and redraw tile for given filename */
 function brInvalidateThumb(name){
   brThumbCache.delete(name);
-  // Find the tile in brPool and queue a redraw
+  // Update lastModified in brFiltered and brAllFiles
+  const f=brFiltered.find(f=>f.name===name)||brAllFiles.find(f=>f.name===name);
+  if(f)f.lastModified=Date.now();
+  // Redraw the tile if visible
   const tile=brPool.find(t=>brFiltered[t.idx]?.name===name);
   if(tile){
-    const f=brFiltered[tile.idx];
+    const fEntry=brFiltered[tile.idx];
     const cv=tile.el.querySelector('canvas');
-    if(f&&cv){
+    if(fEntry&&cv){
       const c=cv.getContext('2d');
       c.fillStyle=dk()?'#2d2c2a':'#e6e4df';c.fillRect(0,0,cv.width,cv.height);
-      brRendQ.push({f,cv,el:tile.el});
+      brRendQ.push({f:fEntry,cv,el:tile.el});
       brDrainRendQ();
     }
+    // Update date label
+    const mt=tile.el.querySelector('.fb-meta');
+    if(mt)mt.textContent=new Date().toLocaleDateString('pl');
   }
 }
 
@@ -1946,38 +2432,98 @@ function drawCachedThumb(name,cv){
 }
 
 function brDrawThumb(txt,W,H){
-  const dim=txt.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)/i);
+  // Normalise commas
+  const t=txt.replace(/(#[\w]+=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'));
+  const dim=t.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)/i);
   if(!dim)return null;
   const DL=parseFloat(dim[1]),DH=parseFloat(dim[2]);
   const oc=document.createElement('canvas');oc.width=W;oc.height=H;
   const c=oc.getContext('2d');
   const d=dk();
+  // Leave a margin for edge banding strips
+  const edgePad=5; // px reserved for edge strips
   c.fillStyle=d?'#1c1b19':'#f9f8f5';c.fillRect(0,0,W,H);
-  const pad=6;
-  const sc=Math.min((W-pad*2)/DL,(H-pad*2)/DH);
-  const ox=(W-DL*sc)/2,oy=(H-DH*sc)/2;
-  // Board
+
+  // Parse SPEC{} for edge banding
+  const specM=t.match(/SPEC\{([\s\S]*?)\}SPEC/);
+  const eg=(k)=>{if(!specM)return null;const m=specM[1].match(new RegExp('EDGE'+k+'=([^\\s%;]+)'));return m?m[1]:null;};
+  const eR=eg('R'),eL=eg('L'),eT=eg('T'),eB=eg('B');
+  const hasEdge=eR||eL||eT||eB;
+  const ep=hasEdge?edgePad:2; // extra pad for edge area
+
+  const pad=3+ep;
+  const padL=pad+(eL?ep:0), padR=pad+(eR?ep:0);
+  const padT=pad+(eT?ep:0), padB=pad+(eB?ep:0);
+  const sc=Math.min((W-padL-padR)/DL,(H-padT-padB)/DH);
+  const ox=padL+(W-padL-padR-DL*sc)/2;
+  const oy=padT+(H-padT-padB-DH*sc)/2;
+
   c.fillStyle=d?'#5a3010':'#c8a060';c.fillRect(ox,oy,DL*sc,DH*sc);
   c.strokeStyle=d?'#4f98a3':'#01696f';c.lineWidth=1;c.strokeRect(ox,oy,DL*sc,DH*sc);
-  // TOP drills
-  const sideRe=/SIDE#1\{([\s\S]*?)\}SIDE/;const sm=txt.match(sideRe);
-  if(sm){
-    const drRe=/W#81\{[^}]*#1=([\d.\-]+)[^}]*#2=([\d.\-]+)[^}]*#1002=([\d.\-]+)/g;
-    let dm;
-    while((dm=drRe.exec(sm[1]))){
-      const x=parseFloat(dm[1]),y=parseFloat(dm[2]),dia=parseFloat(dm[3]);
-      const cx=ox+x*sc,cy=oy+(DH-y)*sc,r=Math.max(1,(dia/2)*sc);
+
+  // Edge banding strips
+  if(hasEdge){
+    const es=Math.max(3,ep-1);
+    c.fillStyle='#f59e0b';c.globalAlpha=0.85;
+    if(eR)c.fillRect(ox+DL*sc+3,oy,es,DH*sc);
+    if(eL)c.fillRect(ox-es-3,oy,es,DH*sc);
+    if(eT)c.fillRect(ox,oy-es-3,DL*sc,es);
+    if(eB)c.fillRect(ox,oy+DH*sc+3,DL*sc,es);
+    c.globalAlpha=1;
+  }
+
+  // Parse all SIDE blocks (not just #1) for full picture
+  const sideBodyRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
+  const sideByLabel={'top':'TOP','bottom':'BOTTOM','front':'FRONT','rear':'BACK','back':'BACK','right':'RIGHT','left':'LEFT'};
+  const sideMapNum={1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  let sm2;
+  while((sm2=sideBodyRe.exec(t))){
+    const num=parseInt(sm2[1]);
+    let side=sideMapNum[num]||'';
+    const lm=sm2[2].match(/\$=(\w+)/);
+    if(lm){const lk=lm[1].toLowerCase();if(sideByLabel[lk])side=sideByLabel[lk];}
+    if(side!=='TOP')continue; // only TOP in thumbnail for now
+    const body=sm2[2];
+
+    // Helper resolving l/h/s variables
+    const gp=(k)=>{const m=body.match(new RegExp('#'+k+'=([^\\s}]+)'));if(!m)return null;const v=m[1].replace(',','.');if(/^l$/i.test(v))return DL;if(/^h$/i.test(v))return DH;const n=parseFloat(v);return isNaN(n)?null:n;};
+    const gpRaw=(raw,k)=>{const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));if(!m)return null;const v=m[1].replace(',','.');if(/^l$/i.test(v))return DL;if(/^h$/i.test(v))return DH;const n=parseFloat(v);return isNaN(n)?null:n;};
+
+    // Drills
+    const drRe=/W#81\{([^}]+)\}/g;let dm;
+    while((dm=drRe.exec(body))){
+      const raw=dm[1];
+      const x=gpRaw(raw,'1'),y=gpRaw(raw,'2'),dia=gpRaw(raw,'1002');
+      if(x===null||y===null)continue;
+      const cx=ox+x*sc,cy=oy+(DH-y)*sc,r=Math.max(1,((dia||8)/2)*sc);
       c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);
-      c.fillStyle=d?'#050505':'#0d0d0d';c.fill();
-      c.strokeStyle=d?'#4f98a3':'#01696f';c.lineWidth=.7;c.stroke();
+      c.fillStyle=d?'#22c55e':'#16a34a';c.fill();
     }
-    // Blades & saw lines
-    const blRe=/W#1050\{[^}]*#8510=([\d.\-]+)[^}]*#8511=([\d.\-]+)[^}]*#8517=([\d.\-]+)/g;
-    let bl;
-    while((bl=blRe.exec(sm[1]))){
-      const x1=parseFloat(bl[1]),y1=parseFloat(bl[2]),x2=parseFloat(bl[3]);
+    // Blades
+    const bl1050=/W#1050\{([^}]+)\}/g;let bl1;
+    while((bl1=bl1050.exec(body))){
+      const raw=bl1[1];
+      const x1=gpRaw(raw,'8510')??gpRaw(raw,'8020')??0;
+      const y1=gpRaw(raw,'8511')??gpRaw(raw,'8021')??0;
+      const x2=gpRaw(raw,'8517')??DL;
       c.beginPath();c.moveTo(ox+x1*sc,oy+(DH-y1)*sc);c.lineTo(ox+x2*sc,oy+(DH-y1)*sc);
-      c.strokeStyle=d?'#f59e0b':'#d97706';c.lineWidth=1.5;c.stroke();
+      c.strokeStyle=d?'#14b8a6':'#0d9488';c.lineWidth=Math.max(1.5,2*sc);c.stroke();
+    }
+    // Mills
+    const millRe=/W#89\{([^}]+)\}([\s\S]*?)(?=W#(?!2201)|$)/g;let ml;
+    while((ml=millRe.exec(body))){
+      const x0=gpRaw(ml[1],'1'),y0=gpRaw(ml[1],'2');
+      if(x0===null||y0===null)continue;
+      const pts=[{x:x0,y:y0}];
+      const ptRe=/W#2201\{([^}]+)\}/g;let sp;
+      while((sp=ptRe.exec(ml[2]))){
+        const px=gpRaw(sp[1],'1'),py=gpRaw(sp[1],'2');
+        if(px!==null&&py!==null)pts.push({x:px,y:py});
+      }
+      if(pts.length<2)continue;
+      c.beginPath();
+      pts.forEach((p,i)=>{i===0?c.moveTo(ox+p.x*sc,oy+(DH-p.y)*sc):c.lineTo(ox+p.x*sc,oy+(DH-p.y)*sc);});
+      c.strokeStyle=d?'#a855f7':'#9333ea';c.lineWidth=1.5;c.stroke();
     }
   }
   return oc.toDataURL();
@@ -2025,6 +2571,18 @@ async function brInitFromIDB(){
       const fbr=document.getElementById('fbr');
       if(fbr){fbr.style.width=Math.max(180,Math.min(700,pw))+'px';onResize();}
     }
+
+    // Restore display toggles
+    const sdm=await IDB.get('showDims').catch(()=>null);
+    const sdd=await IDB.get('showDrillDia').catch(()=>null);
+    const sdp=await IDB.get('showDrillDepth').catch(()=>null);
+    if(sdm===false){showDims=false;const b=document.getElementById('btn-dims');if(b)b.classList.remove('on');}
+    if(sdd===false){showDrillDia=false;const b=document.getElementById('btn-dia');if(b)b.classList.remove('on');}
+    if(sdp===false){showDrillDepth=false;const b=document.getElementById('btn-dep');if(b)b.classList.remove('on');}
+
+    // Restore xray mode
+    const xm=await IDB.get('xrayMode').catch(()=>null);
+    if(xm){xrayMode=true;document.getElementById('btn-xray').classList.add('on');}
 
     // Restore last view
     const lv=await IDB.get('lastView').catch(()=>null);
@@ -2143,7 +2701,7 @@ function initBarcodeSearch(){
 /* ─── FILE LOADING ───────────────────────────────────────────────── */
 async function setupFileLoading(){
   const label=document.querySelector('label[for="fileInput"]');
-  if('showOpenFilePicker' in window){
+  if('showOpenFilePicker' in window&&label){
     label.removeAttribute('for');
     label.onclick=async()=>{
       try{
@@ -2172,7 +2730,7 @@ async function loadFile(f){
     const txt=await f.text();
     cameraFitted=false;
     parseTCN(txt);setLoadedState(true,f.name);
-    renderOps();buildScene(true);if(curView!=='3d')draw2D();showToast('✓ Wczytano: '+f.name);
+    renderOps();renderEdgeInfo();buildScene(true);if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();showToast('✓ Wczytano: '+f.name);
   }catch(err){
     console.error(err);OPS=[];EL={DL:0,DH:0,DS:0};setLoadedState(false,'');
     renderOps();buildScene();draw2D();showToast('Błąd: '+err.message,true);
@@ -2230,12 +2788,13 @@ function renderSawToolsTable(){
   const tb=document.getElementById('saw-tools-body');
   tb.innerHTML=toolSettings.sawTools.map((t,i)=>`<tr>
     <td><input type="number" value="${t.num}" step="1" min="1" onchange="toolSettings.sawTools[${i}].num=+this.value"></td>
+    <td><input type="number" value="${t.width??4}" step="0.5" min="0.1" onchange="toolSettings.sawTools[${i}].width=+this.value"></td>
     <td class="td-del"><button class="btn-del" onclick="removeSawTool(${i})">✕</button></td>
   </tr>`).join('');
 }
 function addMillToolRow(){toolSettings.millTools.push({num:1200,dia:8});renderMillToolsTable();}
 function removeMillTool(i){toolSettings.millTools.splice(i,1);renderMillToolsTable();}
-function addSawToolRow(){toolSettings.sawTools.push({num:1161});renderSawToolsTable();}
+function addSawToolRow(){toolSettings.sawTools.push({num:1161,width:4});renderSawToolsTable();}
 function removeSawTool(i){toolSettings.sawTools.splice(i,1);renderSawToolsTable();}
 
 async function saveSettings(){
@@ -2249,7 +2808,10 @@ async function saveSettings(){
   });
   document.querySelectorAll('#saw-tools-body tr').forEach((tr,i)=>{
     const ins=tr.querySelectorAll('input');
-    if(toolSettings.sawTools[i])toolSettings.sawTools[i].num=parseInt(ins[0].value)||1161;
+    if(toolSettings.sawTools[i]){
+      toolSettings.sawTools[i].num=parseInt(ins[0]?.value)||1161;
+      toolSettings.sawTools[i].width=parseFloat(ins[1]?.value)||4;
+    }
   });
   const gi=document.getElementById('set-bgap');
   if(gi)toolSettings.scannerGap=Math.max(20,Math.min(300,parseInt(gi.value)||80));
@@ -2276,7 +2838,7 @@ document.addEventListener('click',e=>{
     root.setAttribute('data-theme',d);
     tog.innerHTML=d==='dark'?sun:moon;
     IDB.set('theme',d).catch(()=>{});
-    buildScene();if(curView!=='3d')draw2D();
+    buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
   });
   // Theme restored in brInitFromIDB
   window._themeToggle={apply:(t)=>{d=t;root.setAttribute('data-theme',d);tog.innerHTML=d==='dark'?sun:moon;}};
