@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '/Xray overlay on TOP view/,/if\\\\\\(showDims/ {print NR\": \"$0}' /c/Users/Showroom/dev/TPA-Viewer/index.html)"
+    ]
+  }
+}

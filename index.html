@@ -1575,14 +1575,14 @@ function draw2D(){
       let rx,ry,rw,rh,lx,ly,rot=0;
       if(op.side==='FRONT'){
         const cx=tx(op.x);
-        rx=cx-halfD; ry=ty(0); rw=dia*sc; rh=depPx;
+        rx=cx-halfD; ry=ty(0)-depPx; rw=dia*sc; rh=depPx;
         ctx.fillRect(rx,ry,rw,rh);ctx.strokeRect(rx,ry,rw,rh);
-        lx=cx; ly=ry+depPx+labelFontSize+2;
+        lx=cx; ly=ty(0)+labelFontSize+2;
       } else if(op.side==='BACK'){
         const cx=tx(op.x);
-        rx=cx-halfD; ry=ty(cfg.h)-depPx; rw=dia*sc; rh=depPx;
+        rx=cx-halfD; ry=ty(cfg.h); rw=dia*sc; rh=depPx;
         ctx.fillRect(rx,ry,rw,rh);ctx.strokeRect(rx,ry,rw,rh);
-        lx=cx; ly=ry-4;
+        lx=cx; ly=ty(cfg.h)-4;
       } else if(op.side==='RIGHT'){
         const cy=ty(op.x);
         rx=tx(cfg.w)-depPx; ry=cy-halfD; rw=depPx; rh=dia*sc;
