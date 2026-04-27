@@ -486,19 +486,24 @@ function parseTCN(txt){
           j++;
         }
         if(pts.length>=2){
+          const millToolNum=g(raw,'205',null);
           const errors=[];
           if(startX===null)errors.push('brak X (#1)');
           if(startY===null)errors.push('brak Y (#2)');
+          if(millToolNum===null)errors.push('brak nr narzędzia (#205)');
           ops.push({ws:wsid,side,type:'mill',
             x:startX??0,y:startY??0,z:g(raw,'3',0),
-            toolNum:(g(raw,'205',null)||1200)|0,
+            toolNum:(millToolNum||1200)|0,
             pts,_rawLine:rawLine,_raw2201:raw2201Lines,
             errors:errors.length?errors:null});
           i=j;
         } else {
+          const sawErrors=[];
+          if(startX===null)sawErrors.push('brak X (#1)');
+          if(startY===null)sawErrors.push('brak Y (#2)');
           ops.push({ws:wsid,side,type:'saw',
             x:startX??0,y:startY??0,z:g(raw,'3',0),width:g(raw,'1001',3.6),
-            _rawLine:rawLine});
+            _rawLine:rawLine,errors:sawErrors.length?sawErrors:null});
           i++;
         }
 
@@ -520,6 +525,10 @@ function parseTCN(txt){
         let x2=gv2('8517',null);
         const w=gv2('8503',3.6);
         const toolNum=(gv2('8516',1151))|0;
+        const bladeErrors=[];
+        if(x1===null)bladeErrors.push('brak X (#8510/#8020)');
+        if(y1===null)bladeErrors.push('brak Y (#8511/#8021)');
+        if(dep===null)bladeErrors.push('brak głęb. (#8512/#8513/#8022)');
         if(x1===null)x1=0;
         if(y1===null)y1=0;
         if(dep===null)dep=13;
@@ -528,7 +537,8 @@ function parseTCN(txt){
         const isY=Math.abs(x2-x1)<0.01;
         ops.push({ws:wsid,side,type:'blade',
           x:x1,y:y1,x2,y2:y1,orient:isY?'y':'x',
-          z:-dep,width:w,toolNum,_rawLine:rawLine});
+          z:-dep,width:w,toolNum,_rawLine:rawLine,
+          errors:bladeErrors.length?bladeErrors:null});
         i++;
 
       } else { i++; }
@@ -539,7 +549,7 @@ function parseTCN(txt){
 
   // ── Detect new tools not in settings ─────────────────────────────
   const newMillTools=new Set();
-  const newSawTools=new Set();
+  const newSawTools=new Map();
   OPS.forEach(op=>{
     if(op.type==='mill'){
       const num=op.toolNum||1200;
@@ -547,8 +557,8 @@ function parseTCN(txt){
     }
     if(op.type==='blade'){
       const num=op.toolNum||1151;
-      if(toolSettings.sawTools.length&&!toolSettings.sawTools.some(t=>t.num===num))
-        newSawTools.add(num);
+      if(!toolSettings.sawTools.some(t=>t.num===num))
+        newSawTools.set(num, op.width??3.6);
     }
   });
   // Schedule prompt after render
@@ -574,13 +584,13 @@ async function promptNewTools(newMill,newSaw){
     }
   }
   if(newSaw.length){
-    for(const num of newSaw){
-      const add=confirm(`Plik zawiera piłkę #${num} nieznana w ustawieniach.\nCzy dodać numer narzędzia piłki #${num}?`);
+    for(const [num, defWidth] of newSaw){
+      const add=confirm(`Plik zawiera piłkę ${num} nieznana w ustawieniach.\nCzy dodać numer narzędzia piłki? \n(wartość z pliku #8516 = ${num})`);
       if(add){
-        const wStr=prompt(`Podaj szerokość rowka piłki #${num} (mm):`, '4');
+        const wStr=prompt(`Potwierdź szerokość rowka piłki ${num} (mm):\n(wartość z pliku #8503 = ${defWidth})`, String(defWidth));
         const w=parseFloat(wStr);
-        toolSettings.sawTools.push({num,width:isNaN(w)?4:w});
-        showToast(`✓ Dodano piłkę #${num} w=${isNaN(w)?4:w}mm`);
+        toolSettings.sawTools.push({num,width:isNaN(w)?defWidth:w});
+        showToast(`✓ Dodano piłkę ${num} w=${isNaN(w)?defWidth:w}`);
         changed=true;
       }
     }
