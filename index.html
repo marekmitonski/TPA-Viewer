@@ -101,6 +101,7 @@ header{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) var(--s6)
 .fbr-search .si{position:absolute;right:7px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
 .fbr-tools{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .fbr-sort{font-size:10px;padding:2px 6px;border-radius:var(--rsm);background:var(--surfoff);border:1px solid var(--bord);color:var(--muted);cursor:pointer}.fbr-sort.act{background:var(--pri);color:#fff;border-color:var(--pri)}
+@keyframes br-spin{to{transform:rotate(360deg)}}.br-spin{animation:br-spin .65s linear infinite;display:inline-block;transform-origin:center}
 .fbr-size{-webkit-appearance:none;appearance:none;width:70px;height:4px;border-radius:2px;background:var(--bord);outline:none;cursor:pointer}.fbr-size::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--pri)}
 .oi.has-error{border-color:var(--warn)!important;background:color-mix(in oklch,var(--warn) 6%,var(--surf2))!important}
 .op-errors{font-size:10px;color:var(--warn);margin-top:4px;padding:3px 6px;background:color-mix(in oklch,var(--warn) 10%,var(--surfoff));border-radius:var(--rsm)}
@@ -168,6 +169,7 @@ main{display:flex;overflow:hidden}
         <button class="fbr-sort act" id="sort-name" onclick="setBrSort('name')">Nazwa</button>
         <button class="fbr-sort" id="sort-date" onclick="setBrSort('date')">Data ↓</button>
         <input class="fbr-size" id="fbr-size" type="range" min="80" max="400" value="110" title="Rozmiar miniatury" oninput="setBrThumbSize(+this.value)">
+        <button class="fbr-sort" id="br-refresh" onclick="brRefresh()" title="Odśwież katalog" style="padding:2px 5px;line-height:1"><svg class="br-ricon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
         <span class="fbr-count" id="fbr-count">—</span>
       </div>
     </div>
@@ -307,6 +309,10 @@ let _rawTCN='';       // original file text verbatim
 let _rawHeader='';    // everything before first SIDE#
 // Decimal separator of the loaded file (',' or '.') – preserved on save
 let fileDecSep='.';
+// Line ending style of the loaded file – preserved on save
+let fileLineEnding='\r\n';
+// Whether the original file writes integers as X.0 (e.g. 35.0 instead of 35)
+let fileDecInt1=false;
 // System locale decimal separator – used for UI display
 const SYS_DEC=(1.1).toLocaleString().replace(/\d/g,'').trim()||'.';
 let selWs=null,curFilter='ALL',curView='3d',showDims=true,xrayMode=false;
@@ -386,6 +392,8 @@ function parseTCN(txt){
 
   // ── Detect and normalise decimal separator ───────────────────────
   fileDecSep=/[#=]\d+,\d/.test(txt) ? ',' : '.';
+  fileLineEnding=txt.includes('\r\n') ? '\r\n' : '\n';
+  fileDecInt1=(fileDecSep===',' ? /#\d+=\d+,0[\s}]/ : /#\d+=\d+\.0[\s}]/).test(txt);
   const normTxt=fileDecSep===','
     ? txt.replace(/(#[\w]+=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'))
          .replace(/(DL=|DH=|DS=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'))
@@ -1281,7 +1289,7 @@ function changeLabelFont(delta){
 }
 
 function newFile(){
-  OPS=[];selWs=null;fileHandle=null;fileDecSep='.';nextWs=1;
+  OPS=[];selWs=null;fileHandle=null;fileDecSep='.';fileLineEnding='\r\n';fileDecInt1=false;nextWs=1;
   EDGE={R:null,L:null,T:null,B:null};
   EL.DL=600;EL.DH=400;EL.DS=18;
   document.getElementById('ed-dl').value=EL.DL;
@@ -1857,7 +1865,10 @@ function rotate90CW(){
 /* ─── EXPORT ─────────────────────────────────────────────────────── */
 /* Format number for TCN export using detected file decimal separator */
 function fmtTCN(v){
-  // Use up to 4 significant decimal places, strip trailing zeros
+  if(fileDecInt1 && Math.abs(v-Math.round(v))<0.0001){
+    const s=Math.round(v).toFixed(1);
+    return fileDecSep===',' ? s.replace('.',',') : s;
+  }
   const s=parseFloat(v.toFixed(4)).toString();
   return fileDecSep===',' ? s.replace('.',',') : s;
 }
@@ -1893,7 +1904,7 @@ function buildTCNRaw(n){
   if(header.match(/SPEC\{[\s\S]*?\}SPEC/))
     header=header.replace(/SPEC\{[\s\S]*?\}SPEC/,hasEdge?edgeBlock():'SPEC{\n}SPEC');
   else if(hasEdge) header+=edgeBlock()+'\n';
-  lines.push(header.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trimEnd());
+  lines.push(header.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trimEnd().replace(/\n/g,fileLineEnding));
 
   // 2. Rebuild SIDE blocks preserving original structure
   const sideByLabel={'top':'TOP','bottom':'BOTTOM','front':'FRONT','rear':'BACK','back':'BACK','right':'RIGHT','left':'LEFT'};
@@ -1929,7 +1940,7 @@ function buildTCNRaw(n){
     sideOps.forEach(o=>lines.push(buildRawOpLine(o,n)));
     lines.push('}SIDE');
   });
-  return lines.join('\r\n');
+  return lines.join(fileLineEnding);
 }
 
 function buildRawOpLine(o,n){
@@ -1983,7 +1994,7 @@ function buildRawOpLine(o,n){
       rl2=rawSetParam(rl2,'1',n(p.x));rl2=rawSetParam(rl2,'2',n(p.y));rl2=rawSetParam(rl2,'3',n(o.z));
       all.push(rl2);
     });
-    return all.join('\r\n');
+    return all.join(fileLineEnding);
   }
   if(o.type==='blade'){
     let rl=o._rawLine;
@@ -2025,7 +2036,7 @@ function buildTCNGenerated(n){
     });
     lines.push('}SIDE');
   });
-  return lines.join('\r\n');
+  return lines.join(fileLineEnding);
 }
 
 async function saveTCN(){
@@ -2061,6 +2072,7 @@ async function saveTCNAs(){
       fileHandle=h;fileName=h.name;
       await IDB.set('lastHandle',h);
       brInvalidateThumb(fileName);
+      if(brDirHandle)brLoadDir();
       const nb=document.getElementById('file-name-badge');
       if(nb)nb.textContent=fileName;
       showToast('✓ Zapisano jako: '+fileName);return;
@@ -2134,6 +2146,9 @@ let brScrollRAF=null;
 // Virtual scroll state
 let brItemH=0;           // item height px (set after first render)
 let brCols=1;
+// Directory watcher
+let brWatchTimer=null;
+let brWatchBusy=false;
 
 function brThumbH(){ return Math.round(brThumbW*0.55)+28+16; } // canvas+name+meta
 
@@ -2177,8 +2192,8 @@ async function brLoadDir(){
   brApplySort();
   brApplySearch();
   document.getElementById('fbr-status').textContent=brDirHandle.name;
-  // Fetch dates async without blocking
   brFetchDates(files);
+  brStartWatch();
 }
 
 async function brFetchDates(files){
@@ -2190,6 +2205,35 @@ async function brFetchDates(files){
     }));
     if(brSort==='date'){brApplySort();brApplySearch();}
   }
+}
+
+function brStartWatch(){
+  brStopWatch();
+  if(!brDirHandle)return;
+  brWatchTimer=setInterval(brPollDir,4000);
+}
+function brStopWatch(){
+  if(brWatchTimer){clearInterval(brWatchTimer);brWatchTimer=null;}
+}
+async function brPollDir(){
+  if(!brDirHandle||brWatchBusy)return;
+  brWatchBusy=true;
+  try{
+    const names=new Set();
+    for await(const [name,fh] of brDirHandle.entries()){
+      if(fh.kind==='file'&&/\.(tcn)$/i.test(name))names.add(name);
+    }
+    const cur=new Set(brAllFiles.map(f=>f.name));
+    const changed=names.size!==cur.size||[...names].some(n=>!cur.has(n))||[...cur].some(n=>!names.has(n));
+    if(changed)await brLoadDir();
+  }catch(e){}finally{brWatchBusy=false;}
+}
+async function brRefresh(){
+  if(!brDirHandle)return;
+  const ico=document.querySelector('#br-refresh .br-ricon');
+  if(ico)ico.classList.add('br-spin');
+  await brLoadDir();
+  if(ico)ico.classList.remove('br-spin');
 }
 
 let brDateDir='desc'; // 'desc'=newest first, 'asc'=oldest first
