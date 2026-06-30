@@ -45,6 +45,10 @@ header{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) var(--s6)
 .oi{background:var(--surf2);border:1px solid var(--bord);border-radius:var(--rmd);padding:var(--s3);margin-bottom:var(--s2);cursor:pointer}.oi:hover{border-color:var(--pri)}.oi.sel{border-color:var(--pri);box-shadow:0 0 0 1px var(--pri);background:color-mix(in oklch,var(--pri) 6%,var(--surf2))}
 .oih{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--s2)}
 .oid{font-size:var(--txs);font-weight:700;color:var(--pri)}
+.oic{font-size:9px;color:var(--faint);display:inline-block;transition:transform .15s;vertical-align:middle}
+.oi:not(.collapsed) .oic{transform:rotate(90deg)}
+.oi.collapsed .oih{margin-bottom:0}
+.oi.collapsed .ofl,.oi.collapsed .op-errors{display:none}
 .otb{font-size:var(--txs);padding:1px 6px;border-radius:999px;background:var(--surfoff)}
 .otb.drill{background:color-mix(in oklch,var(--pri) 15%,var(--surfoff))}
 .otb.saw,.otb.blade{background:color-mix(in oklch,var(--warn) 15%,var(--surfoff));color:var(--warn)}
@@ -317,6 +321,7 @@ let fileDecInt1=false;
 const SYS_DEC=(1.1).toLocaleString().replace(/\d/g,'').trim()||'.';
 let selWs=null,curFilter='ALL',curView='3d',showDims=true,xrayMode=false;
 let showDrillDia=true,showDrillDepth=true;
+const expandedOps=new Set(); // ws-id of operacji rozwiniętych na liście (domyślnie zwinięte)
 // Edge banding: keys R,L,T,B (Right/Left/Top/Bottom in TOP-view coords)
 let EDGE={R:null,L:null,T:null,B:null}; // null = no banding, string = material name
 let _edgeNames={R:'Okleina PCV',L:'Okleina PCV',T:'Okleina PCV',B:'Okleina PCV'}; // last-known names
@@ -384,6 +389,31 @@ function setLoadedState(ok,name=''){
 }
 
 /* ─── PARSER ─────────────────────────────────────────────────────── */
+/* Evaluate a TPA coordinate value: a plain number, a dimension variable
+   (l/x→DL długość, h/z→DH wysokość, s/y→DS grubość) or a simple arithmetic
+   expression mixing them (np. "y/2", "18-9", "l/2-10"). Returns a number,
+   or null when it cannot be resolved. Used only for VISUALISATION — the raw
+   file text is stored verbatim, so saving is unaffected. */
+function evalTcnExpr(valStr,dims){
+  if(valStr==null)return null;
+  let s=String(valStr).trim().replace(/,/g,'.');
+  if(s==='')return null;
+  // fast path: plain (signed/decimal) number
+  if(/^-?\d*\.?\d+$/.test(s))return parseFloat(s);
+  const D=dims||EL;
+  // X = długość (DL), Y = grubość (DS), Z = wysokość (DH)
+  const vars={l:D.DL,h:D.DH,s:D.DS,x:D.DL,y:D.DS,z:D.DH};
+  const expr=s.replace(/[a-z]+/gi,(m)=>{
+    const k=m.toLowerCase();
+    return (k in vars && vars[k]!=null && !isNaN(vars[k]))?'('+vars[k]+')':'@';
+  });
+  if(/@/.test(expr))return null;                 // unresolved variable name
+  if(!/^[\d+\-*/().\s]+$/.test(expr))return null; // only safe math chars remain
+  try{
+    const v=Function('"use strict";return('+expr+')')();
+    return (typeof v==='number'&&isFinite(v))?v:null;
+  }catch(_){return null;}
+}
 function parseTCN(txt){
   _rawTCN=txt; // keep verbatim original
   // Extract header (everything before first SIDE#)
@@ -414,8 +444,11 @@ function parseTCN(txt){
     EDGE.R=eg('R');EDGE.L=eg('L');EDGE.T=eg('T');EDGE.B=eg('B');
     ['R','L','T','B'].forEach(k=>{if(EDGE[k])_edgeNames[k]=EDGE[k];});
   }
-  // Extended sideMap: older TPA uses SIDE#2 and SIDE#5 for BACK
-  const sideMap={1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  // Extended sideMap: older TPA uses SIDE#2 and SIDE#5 for BACK.
+  // SIDE#0 ("$=F #0") is the main panel face used in the EDICAD 01.00 variant → TOP.
+  const sideMap={0:'TOP',1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  // face number (WF=) → strona; np. WF=1 = góra (face 1)
+  const faceMap={1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
   // Also detect side by $=Label inside the body
   const sideByLabel={'top':'TOP','bottom':'BOTTOM','front':'FRONT','rear':'BACK','back':'BACK','right':'RIGHT','left':'LEFT'};
   const sideRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
@@ -424,12 +457,8 @@ function parseTCN(txt){
   const g=(raw,k,def=null)=>{
     const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));
     if(!m)return def;
-    const val=m[1].replace(',','.');
-    if(/^l$/i.test(val))return EL.DL;
-    if(/^h$/i.test(val))return EL.DH;
-    if(/^s$/i.test(val))return EL.DS;
-    const v=parseFloat(val);
-    return isNaN(v)?def:v;
+    const v=evalTcnExpr(m[1]);
+    return v===null?def:v;
   };
   // gv: like g but rejects non-numeric values (variable names like 'l', 'b')
   const gv=(raw,k,def=null)=>{
@@ -439,6 +468,8 @@ function parseTCN(txt){
     return isNaN(v)?def:v;
   };
   const ws=(raw)=>{const wm=raw.match(/WS=(\d+)/);return wm?parseInt(wm[1]):null;};
+  // WF= identifies the face directly inside the W block (EDICAD 01.00 variant)
+  const wf=(raw)=>{const wm=raw.match(/WF=(\d+)/);return wm?parseInt(wm[1]):null;};
 
   // Use normalized text for parsing but keep original side blocks for raw storage
   const origSideRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
@@ -467,6 +498,9 @@ function parseTCN(txt){
       const rawLine=origToks[i]?.full||`W#${code}{${raw}}W`; // original verbatim
       const wsid=ws(raw)??autoWs++;
       if(wsid>maxWs)maxWs=wsid;
+      // Per-op face: prefer WF= inside the block, fall back to the SIDE# block
+      const wff=wf(raw);
+      const opSide=(wff!=null&&faceMap[wff])?faceMap[wff]:side;
 
       if(code==='81'){
         const x=g(raw,'1',null), y=g(raw,'2',null), z=g(raw,'3',null), dia=g(raw,'1002',null);
@@ -475,7 +509,7 @@ function parseTCN(txt){
         if(y===null)errors.push('brak Y (#2)');
         if(z===null)errors.push('brak głęb. (#3)');
         if(dia===null)errors.push('brak śr. (#1002)');
-        ops.push({ws:wsid,side,type:'drill',
+        ops.push({ws:wsid,side:opSide,type:'drill',
           x:x??0,y:y??0,z:z??0,dia:dia??8,
           _rawLine:rawLine,
           errors:errors.length?errors:null});
@@ -499,7 +533,7 @@ function parseTCN(txt){
           if(startX===null)errors.push('brak X (#1)');
           if(startY===null)errors.push('brak Y (#2)');
           if(millToolNum===null)errors.push('brak nr narzędzia (#205)');
-          ops.push({ws:wsid,side,type:'mill',
+          ops.push({ws:wsid,side:opSide,type:'mill',
             x:startX??0,y:startY??0,z:g(raw,'3',0),
             toolNum:(millToolNum||1200)|0,
             pts,_rawLine:rawLine,_raw2201:raw2201Lines,
@@ -509,7 +543,7 @@ function parseTCN(txt){
           const sawErrors=[];
           if(startX===null)sawErrors.push('brak X (#1)');
           if(startY===null)sawErrors.push('brak Y (#2)');
-          ops.push({ws:wsid,side,type:'saw',
+          ops.push({ws:wsid,side:opSide,type:'saw',
             x:startX??0,y:startY??0,z:g(raw,'3',0),width:g(raw,'1001',3.6),
             _rawLine:rawLine,errors:sawErrors.length?sawErrors:null});
           i++;
@@ -519,13 +553,8 @@ function parseTCN(txt){
         const gv2=(k,def=null)=>{
           const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));
           if(!m)return def;
-          const val=m[1].replace(',','.');
-          // Resolve dimension variables
-          if(/^l$/i.test(val))return EL.DL;
-          if(/^h$/i.test(val))return EL.DH;
-          if(/^s$/i.test(val))return EL.DS;
-          const v=parseFloat(val);
-          return isNaN(v)?def:v;
+          const v=evalTcnExpr(m[1]);
+          return v===null?def:v;
         };
         let x1=gv2('8510',null)??gv2('8020',null);
         let y1=gv2('8511',null)??gv2('8021',null);
@@ -543,7 +572,7 @@ function parseTCN(txt){
         if(x2===null)x2=EL.DL;
         dep=Math.abs(dep);
         const isY=Math.abs(x2-x1)<0.01;
-        ops.push({ws:wsid,side,type:'blade',
+        ops.push({ws:wsid,side:opSide,type:'blade',
           x:x1,y:y1,x2,y2:y1,orient:isY?'y':'x',
           z:-dep,width:w,toolNum,_rawLine:rawLine,
           errors:bladeErrors.length?bladeErrors:null});
@@ -1008,6 +1037,7 @@ function openAddForm(type){
   }
   if(!op)return;
   OPS.push(op);
+  expandedOps.clear();expandedOps.add(ws); // nowo dodaną operację od razu rozwiń (akordeon)
   selectOp(ws,false);
   renderOps();buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
   // Scroll new op card into view
@@ -1119,7 +1149,7 @@ function onSawToolChange(ws,val){
 function renderOps(){
   const cont=document.getElementById('ops-list');
   const fil=curFilter==='ALL'?OPS:OPS.filter(o=>o.side===curFilter);
-  const lbl={TOP:'Góra (TOP)',FRONT:'Przód (FRONT)',RIGHT:'Prawa (RIGHT)',BACK:'Tył (BACK)',LEFT:'Lewa (LEFT)'};
+  const lbl={TOP:'Góra — face 1',BOTTOM:'Dół — face 2',FRONT:'Przód — face 3',RIGHT:'Prawa — face 4',BACK:'Tył — face 5',LEFT:'Lewa — face 6'};
   const gs={};fil.forEach(o=>{if(!gs[o.side])gs[o.side]=[];gs[o.side].push(o);});
   cont.innerHTML='';
   for(const side in gs){
@@ -1127,7 +1157,7 @@ function renderOps(){
     g.innerHTML=`<div class="ogt">${lbl[side]||side}</div>`;
     gs[side].forEach(op=>{
       const it=document.createElement('div');
-      it.className='oi'+(selWs===op.ws?' sel':'')+(op.errors?' has-error':'');it.dataset.ws=op.ws;
+      it.className='oi'+(expandedOps.has(op.ws)?'':' collapsed')+(selWs===op.ws?' sel':'')+(op.errors?' has-error':'');it.dataset.ws=op.ws;
       let badge='',fields='';
       if(op.type==='drill'){
         badge=`Nawiert ⌀${fv(op.dia)}mm`;
@@ -1186,13 +1216,20 @@ ${depField}
       }
       const errHtml=op.errors?`<div class="op-errors">⚠ ${op.errors.join(' · ')}</div>`:'';
       it.innerHTML=`<div class="oih">
-  <span class="oid">WS=${op.ws}</span>
+  <span class="oid"><span class="oic">▸</span> Work ${op.ws}</span>
   <div style="display:flex;gap:var(--s1);align-items:center">
     <span class="otb ${op.type}">${badge}</span>
-    <button class="btn-del" onclick="event.stopPropagation();deleteOp(${op.ws})" title="Usuń">✕</button>
+    <button class="btn-del" onclick="event.stopPropagation();deleteOp(${op.ws})" title="Usuń">🗑</button>
   </div>
 </div><div class="ofl">${fields}</div>${errHtml}`;
-      it.addEventListener('click',e=>{if(['INPUT','BUTTON','SELECT'].includes(e.target.tagName))return;selectOp(op.ws,false);});
+      it.addEventListener('click',e=>{
+        if(['INPUT','BUTTON','SELECT'].includes(e.target.tagName))return;
+        const wasOpen=expandedOps.has(op.ws);
+        expandedOps.clear();                 // akordeon: tylko jedna pozycja otwarta
+        if(!wasOpen)expandedOps.add(op.ws);
+        document.querySelectorAll('#ops-list .oi').forEach(el=>el.classList.toggle('collapsed',!expandedOps.has(+el.dataset.ws)));
+        selectOp(op.ws,false);
+      });
       g.appendChild(it);
     });
     cont.appendChild(g);
@@ -1883,7 +1920,8 @@ function rawSetParam(line,param,value){
 function buildTCNText(){
   const errOps=OPS.filter(o=>o.errors&&o.errors.length);
   if(errOps.length){
-    const names=errOps.map(o=>`WS=${o.ws} (${o.type})`).join(', ');
+    const faceNum={TOP:1,BOTTOM:2,FRONT:3,RIGHT:4,BACK:5,LEFT:6};
+    const names=errOps.map(o=>`Work ${o.ws} / face ${faceNum[o.side]||'?'} (${o.type})`).join(', ');
     throw new Error(`Plik zawiera operacje z błędami: ${names}.\nUzupełnij lub usuń je przed zapisaniem.`);
   }
   const n=fmtTCN;
@@ -1908,7 +1946,7 @@ function buildTCNRaw(n){
 
   // 2. Rebuild SIDE blocks preserving original structure
   const sideByLabel={'top':'TOP','bottom':'BOTTOM','front':'FRONT','rear':'BACK','back':'BACK','right':'RIGHT','left':'LEFT'};
-  const sideMapNum={1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  const sideMapNum={0:'TOP',1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
   const sideNumForName={TOP:1,BOTTOM:2,FRONT:3,RIGHT:4,BACK:5,LEFT:6};
   const opsBySide={};
   OPS.forEach(o=>{if(!opsBySide[o.side])opsBySide[o.side]=[];opsBySide[o.side].push(o);});
@@ -2529,7 +2567,7 @@ function brDrawThumb(txt,W,H){
   // Parse all SIDE blocks (not just #1) for full picture
   const sideBodyRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
   const sideByLabel={'top':'TOP','bottom':'BOTTOM','front':'FRONT','rear':'BACK','back':'BACK','right':'RIGHT','left':'LEFT'};
-  const sideMapNum={1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
+  const sideMapNum={0:'TOP',1:'TOP',2:'BOTTOM',3:'FRONT',4:'RIGHT',5:'BACK',6:'LEFT'};
   let sm2;
   while((sm2=sideBodyRe.exec(t))){
     const num=parseInt(sm2[1]);
@@ -2540,8 +2578,9 @@ function brDrawThumb(txt,W,H){
     const body=sm2[2];
 
     // Helper resolving l/h/s variables
-    const gp=(k)=>{const m=body.match(new RegExp('#'+k+'=([^\\s}]+)'));if(!m)return null;const v=m[1].replace(',','.');if(/^l$/i.test(v))return DL;if(/^h$/i.test(v))return DH;const n=parseFloat(v);return isNaN(n)?null:n;};
-    const gpRaw=(raw,k)=>{const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));if(!m)return null;const v=m[1].replace(',','.');if(/^l$/i.test(v))return DL;if(/^h$/i.test(v))return DH;const n=parseFloat(v);return isNaN(n)?null:n;};
+    const _td={DL,DH,DS:EL.DS};
+    const gp=(k)=>{const m=body.match(new RegExp('#'+k+'=([^\\s}]+)'));return m?evalTcnExpr(m[1],_td):null;};
+    const gpRaw=(raw,k)=>{const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));return m?evalTcnExpr(m[1],_td):null;};
 
     // Drills
     const drRe=/W#81\{([^}]+)\}/g;let dm;
