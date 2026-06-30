@@ -1155,7 +1155,8 @@ function renderOps(){
   for(const side in gs){
     const g=document.createElement('div');g.className='og';
     g.innerHTML=`<div class="ogt">${lbl[side]||side}</div>`;
-    gs[side].forEach(op=>{
+    gs[side].forEach((op,idx)=>{
+      const workNo=idx+1; // numeracja Work od 1 na każdym face
       const it=document.createElement('div');
       it.className='oi'+(expandedOps.has(op.ws)?'':' collapsed')+(selWs===op.ws?' sel':'')+(op.errors?' has-error':'');it.dataset.ws=op.ws;
       let badge='',fields='';
@@ -1216,7 +1217,7 @@ ${depField}
       }
       const errHtml=op.errors?`<div class="op-errors">⚠ ${op.errors.join(' · ')}</div>`:'';
       it.innerHTML=`<div class="oih">
-  <span class="oid"><span class="oic">▸</span> Work ${op.ws}</span>
+  <span class="oid"><span class="oic">▸</span> Work ${workNo}</span>
   <div style="display:flex;gap:var(--s1);align-items:center">
     <span class="otb ${op.type}">${badge}</span>
     <button class="btn-del" onclick="event.stopPropagation();deleteOp(${op.ws})" title="Usuń">🗑</button>
@@ -1921,7 +1922,8 @@ function buildTCNText(){
   const errOps=OPS.filter(o=>o.errors&&o.errors.length);
   if(errOps.length){
     const faceNum={TOP:1,BOTTOM:2,FRONT:3,RIGHT:4,BACK:5,LEFT:6};
-    const names=errOps.map(o=>`Work ${o.ws} / face ${faceNum[o.side]||'?'} (${o.type})`).join(', ');
+    const faceIdx=(o)=>OPS.filter(p=>p.side===o.side).indexOf(o)+1; // Work liczony od 1 na face
+    const names=errOps.map(o=>`Work ${faceIdx(o)} / face ${faceNum[o.side]||'?'} (${o.type})`).join(', ');
     throw new Error(`Plik zawiera operacje z błędami: ${names}.\nUzupełnij lub usuń je przed zapisaniem.`);
   }
   const n=fmtTCN;
