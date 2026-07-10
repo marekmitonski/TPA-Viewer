@@ -231,9 +231,35 @@ main{display:flex;overflow:hidden}
     <div id="c-gen" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:80px var(--s6) var(--s6);background:var(--bg)">
       <div class="gen-wrap">
         <div class="box">
-          <h3>🗄 Generator szafki</h3>
-          <div class="gen-grid">
-            <div class="dimf"><label>Typ szafki</label><select id="gen-cab-run" class="gen-sel" onchange="genSelCab(+this.value)"></select></div>
+          <h3>🗄 Rodzaj szafki</h3>
+          <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap">
+            <div class="dimf" style="flex:1;min-width:220px"><label>Wybierz szafkę</label><select id="gen-cab-run" class="gen-sel" onchange="genSelCab(+this.value)"></select></div>
+            <button class="btn btn-sec" onclick="genAddCab()">＋ Dodaj szafkę</button>
+            <button class="btn btn-sec" onclick="genDelCab()">− Usuń szafkę</button>
+            <button class="btn btn-sec" id="gen-opts-toggle" onclick="genToggleOpts()">⚙ Ustawienia</button>
+          </div>
+        </div>
+        <div class="box" id="gen-opts-box" style="display:none">
+          <h3 id="gen-opts-title">⚙ Ustawienia szafki</h3>
+          <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap;margin-bottom:var(--s3)">
+            <div class="dimf" style="flex:1;min-width:180px"><label>Nazwa szafki</label><input type="text" id="gen-cab-name" style="text-align:left" onchange="genRenameCab(this.value)"></div>
+            <div class="dimf"><label>System kodów</label><select id="gen-base" class="gen-sel" style="width:auto" onchange="genBaseChanged()">
+              <option value="16">szesnastkowy (16)</option>
+              <option value="10">dziesiętny (10)</option>
+            </select></div>
+          </div>
+          <p class="gen-note">Wzory wymiarów: <b>H</b>=wysokość, <b>W</b>=szerokość, <b>D</b>=głębokość, <b>T</b>=grubość płyty, <b>N</b>=ilość półek. Dozwolone + − * / ( ), np. <b>W-2*T</b>. Ilość też może być wzorem (np. <b>N</b>). Szablon TCN jest podpięty na stałe – przy generowaniu podmieniane są w nim tylko wymiary (::UNm DL/DH/DS); brak szablonu = pusty plik TCN. Zmiany zapisują się automatycznie.</p>
+          <div class="gen-table-wrap">
+          <table class="gen-table">
+            <thead><tr><th>Element</th><th>Ilość</th><th>DL (wzór)</th><th>DH (wzór)</th><th>Grub. (wzór)</th><th>Szablon TCN</th><th></th></tr></thead>
+            <tbody id="gen-def-tbody"></tbody>
+          </table>
+          </div>
+          <button class="btn btn-sec" onclick="genDefAddEl()" style="margin-top:var(--s3)">+ Dodaj element</button>
+        </div>
+        <div class="box">
+          <h3>Wymiary i generowanie</h3>
+          <div class="gen-grid" style="grid-template-columns:repeat(5,1fr)">
             <div class="dimf"><label>Wysokość (mm)</label><input type="number" id="gen-h" value="720" step="1"></div>
             <div class="dimf"><label>Szerokość (mm)</label><input type="number" id="gen-w" value="600" step="1"></div>
             <div class="dimf"><label>Głębokość (mm)</label><input type="number" id="gen-d" value="510" step="1"></div>
@@ -241,34 +267,6 @@ main{display:flex;overflow:hidden}
             <div class="dimf"><label>Grubość płyty (mm)</label><input type="number" id="gen-t" value="18" step="0.1"></div>
           </div>
           <button class="btn btn-p" onclick="genBuildList()" style="margin-top:var(--s3)">Generuj listę elementów</button>
-        </div>
-        <div class="box">
-          <div style="display:flex;align-items:center;gap:var(--s2)">
-            <h3 style="margin-bottom:0">⚙ Opcje szafek</h3>
-            <button class="btn btn-sec" id="gen-opts-toggle" style="margin-left:auto;font-size:var(--txs);padding:4px 10px" onclick="genToggleOpts()">Pokaż</button>
-          </div>
-          <div id="gen-opts" style="display:none;margin-top:var(--s3)">
-            <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap;margin-bottom:var(--s3)">
-              <div class="dimf" style="flex:1;min-width:180px"><label>Nazwa szafki</label><input type="text" id="gen-cab-name" style="text-align:left" onchange="genRenameCab(this.value)"></div>
-              <button class="btn btn-sec" onclick="genAddCab()">＋ Nowa szafka</button>
-              <button class="btn btn-sec" onclick="genDelCab()">Usuń szafkę</button>
-            </div>
-            <p class="gen-note">Wzory wymiarów: <b>H</b>=wysokość, <b>W</b>=szerokość, <b>D</b>=głębokość, <b>T</b>=grubość płyty, <b>N</b>=ilość półek. Dozwolone + − * / ( ), np. <b>W-2*T</b>. Ilość też może być wzorem (np. <b>N</b>). Szablon TCN jest podpięty na stałe – przy generowaniu podmieniane są w nim tylko wymiary (::UNm DL/DH/DS); brak szablonu = pusty plik TCN.</p>
-            <div class="gen-table-wrap">
-            <table class="gen-table">
-              <thead><tr><th>Element</th><th>Ilość</th><th>DL (wzór)</th><th>DH (wzór)</th><th>Grub. (wzór)</th><th>Szablon TCN</th><th></th></tr></thead>
-              <tbody id="gen-def-tbody"></tbody>
-            </table>
-            </div>
-            <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:flex-end;flex-wrap:wrap">
-              <button class="btn btn-sec" onclick="genDefAddEl()">+ Element</button>
-              <div class="dimf"><label>System kodów</label><select id="gen-base" class="gen-sel" style="width:auto">
-                <option value="16">szesnastkowy (16)</option>
-                <option value="10">dziesiętny (10)</option>
-              </select></div>
-              <button class="btn btn-p" style="margin-left:auto" onclick="genSaveOpts()">Zapisz opcje</button>
-            </div>
-          </div>
         </div>
         <div class="box" id="gen-list-box" style="display:none">
           <h3>Spis elementów</h3>
@@ -3136,39 +3134,68 @@ function genAddRow(){
   genRenderRows();
 }
 
-/* ── Opcje szafek: definicje, wzory, szablony ───────────────────── */
+/* ── Ustawienia szafek: definicje, wzory, szablony ──────────────── */
+let genPersistTimer=null;
+/* Autozapis definicji do IDB (debounce) */
+function genPersist(){
+  clearTimeout(genPersistTimer);
+  genPersistTimer=setTimeout(async()=>{
+    try{
+      await IDB.set('genCabinets',genCabinets); // uchwyty plików zapisują się razem z definicją
+      await IDB.set('genOpts',genOpts);
+    }catch(e){console.warn('genPersist:',e);showToast('Błąd zapisu ustawień szafek',true);}
+  },400);
+}
 function genToggleOpts(){
-  const p=document.getElementById('gen-opts');
+  const p=document.getElementById('gen-opts-box');
   const vis=p.style.display!=='none';
   p.style.display=vis?'none':'';
-  document.getElementById('gen-opts-toggle').textContent=vis?'Pokaż':'Ukryj';
+  document.getElementById('gen-opts-toggle').textContent=vis?'⚙ Ustawienia':'⚙ Ukryj ustawienia';
 }
 function genRenderCabSel(){
   const sel=document.getElementById('gen-cab-run');
   sel.innerHTML=genCabinets.map((c,i)=>`<option value="${i}"${i===genCabSel?' selected':''}>${c.name}</option>`).join('');
   const nameInp=document.getElementById('gen-cab-name');
   if(nameInp)nameInp.value=genCab()?.name||'';
+  const title=document.getElementById('gen-opts-title');
+  if(title)title.textContent='⚙ Ustawienia szafki: '+(genCab()?.name||'');
   const baseSel=document.getElementById('gen-base');
   if(baseSel)baseSel.value=String(genOpts.base===10?10:16);
   genRenderDefs();
 }
 function genSelCab(i){genCabSel=Math.max(0,Math.min(genCabinets.length-1,i));genRenderCabSel();}
 function genAddCab(){
-  genCabinets.push({id:Date.now(),name:'Nowa szafka',els:[]});
+  const name=prompt('Nazwa nowej szafki (np. Szafka wisząca):','Nowa szafka');
+  if(name===null)return;
+  // Nowa szafka startuje z typowym zestawem elementów – łatwiej edytować niż budować od zera
+  const cab=genDefaultCabinet();
+  cab.name=name.trim()||'Nowa szafka';
+  genCabinets.push(cab);
   genCabSel=genCabinets.length-1;
   genRenderCabSel();
+  // Od razu otwórz ustawienia, żeby dostosować elementy i szablony
+  if(document.getElementById('gen-opts-box').style.display==='none')genToggleOpts();
+  genPersist();
+  showToast('✓ Dodano szafkę „'+cab.name+'” – dostosuj elementy');
 }
 function genDelCab(){
   if(genCabinets.length<=1){showToast('Musi zostać przynajmniej jedna szafka',true);return;}
-  if(!confirm(`Usunąć szafkę „${genCab()?.name}”?`))return;
+  if(!confirm(`Usunąć szafkę „${genCab()?.name}” wraz z jej elementami i szablonami?`))return;
   genCabinets.splice(genCabSel,1);
   genCabSel=0;
   genRenderCabSel();
+  genPersist();
 }
 function genRenameCab(v){
   const c=genCab();if(!c)return;
   c.name=v.trim()||c.name;
   genRenderCabSel();
+  genPersist();
+}
+function genBaseChanged(){
+  const baseSel=document.getElementById('gen-base');
+  genOpts.base=(+baseSel.value===10)?10:16;
+  genPersist();
 }
 function genRenderDefs(){
   const tb=document.getElementById('gen-def-tbody');
@@ -3187,12 +3214,13 @@ function genRenderDefs(){
     <td class="td-del"><button class="btn-del" onclick="genDefDelEl(${i})">✕</button></td>
   </tr>`).join('');
 }
-function genDefUpd(i,f,v){const c=genCab();if(c?.els[i])c.els[i][f]=f==='name'?v:v.trim();}
-function genDefDelEl(i){const c=genCab();if(!c)return;c.els.splice(i,1);genRenderDefs();}
+function genDefUpd(i,f,v){const c=genCab();if(c?.els[i]){c.els[i][f]=f==='name'?v:v.trim();genPersist();}}
+function genDefDelEl(i){const c=genCab();if(!c)return;c.els.splice(i,1);genRenderDefs();genPersist();}
 function genDefAddEl(){
   const c=genCab();if(!c)return;
   c.els.push({name:'Element',qty:'1',dl:'W-2*T',dh:'D',ds:'T',tpl:null});
   genRenderDefs();
+  genPersist();
 }
 async function genDefPickTpl(i){
   const c=genCab();if(!c?.els[i])return;
@@ -3201,16 +3229,8 @@ async function genDefPickTpl(i){
     const [h]=await window.showOpenFilePicker({types:[{description:'TCN files',accept:{'text/plain':['.TCN','.tcn']}}]});
     c.els[i].tpl=h;
     genRenderDefs();
+    genPersist();
   }catch(e){if(e.name!=='AbortError')console.error(e);}
-}
-async function genSaveOpts(){
-  const baseSel=document.getElementById('gen-base');
-  genOpts.base=(+baseSel.value===10)?10:16;
-  try{
-    await IDB.set('genCabinets',genCabinets); // uchwyty plików zapisują się razem z definicją
-    await IDB.set('genOpts',genOpts);
-    showToast('✓ Zapisano opcje szafek');
-  }catch(e){showToast('Błąd zapisu opcji: '+e.message,true);}
 }
 
 async function genPickOutDir(){
