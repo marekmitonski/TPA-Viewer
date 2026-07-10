@@ -132,6 +132,19 @@ main{display:flex;overflow:hidden}
 .pt-row{display:flex;align-items:center;gap:var(--s1);font-size:var(--txs);margin-bottom:2px}
 .pt-row input{flex:1;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px var(--s1);font-size:var(--txs);text-align:right;width:60px}
 .pt-del{padding:1px 5px;border-radius:var(--rsm);font-size:10px;background:color-mix(in oklch,var(--warn) 12%,var(--surfoff));border:1px solid color-mix(in oklch,var(--warn) 30%,var(--bord));color:var(--warn);cursor:pointer}
+/* ── CABINET GENERATOR ───────────────────────────────────────────── */
+.gen-wrap{max-width:1020px;margin:0 auto}
+.gen-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--s2)}
+.gen-note{font-size:var(--txs);color:var(--muted);margin-bottom:var(--s3)}
+.gen-sel{width:100%;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:var(--s2);font-size:var(--tsm);color:var(--txt)}.gen-sel:focus{outline:none;border-color:var(--pri)}
+.gen-table-wrap{overflow-x:auto}
+.gen-table{width:100%;border-collapse:collapse;font-size:var(--tsm)}
+.gen-table th{text-align:left;font-size:var(--txs);color:var(--faint);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--bord);white-space:nowrap}
+.gen-table td{padding:4px 6px;border-bottom:1px solid var(--div);vertical-align:middle}
+.gen-table input[type=number]{width:76px;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px 6px;font-size:var(--tsm);color:var(--txt);text-align:right}
+.gen-table input[type=text]{width:100%;min-width:110px;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px 6px;font-size:var(--tsm);color:var(--txt)}
+.gen-table select{background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:4px 6px;font-size:var(--tsm);color:var(--txt)}
+.gen-table input:focus,.gen-table select:focus{outline:none;border-color:var(--pri)}
 </style>
 </head>
 <body>
@@ -202,6 +215,7 @@ main{display:flex;overflow:hidden}
       <button class="tbtn" id="tab-right" onclick="switchView('right')">RIGHT</button>
       <button class="tbtn" id="tab-left" onclick="switchView('left')">LEFT</button>
       <button class="tbtn" id="tab-code" onclick="switchView('code')">CODE</button>
+      <button class="tbtn" id="tab-gen" onclick="switchView('gen')">SZAFKA</button>
     </div>
     <div style="position:absolute;top:var(--s4);right:var(--s4);z-index:15;display:flex;gap:4px;align-items:center" id="top-bar">
       <button class="btn-tog on" id="btn-dims" onclick="toggleDims()" style="display:none">📐 Wymiary</button>
@@ -213,6 +227,66 @@ main{display:flex;overflow:hidden}
     <canvas id="c2d"></canvas>
     <div id="c-code" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:80px var(--s4) var(--s4);background:var(--bg)">
       <pre id="code-content" style="font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.6;color:var(--txt);background:var(--surf2);padding:var(--s4);border-radius:var(--rlg);border:1px solid var(--bord);white-space:pre-wrap;word-break:break-all;margin:0;min-height:calc(100% - var(--s8))"></pre>
+    </div>
+    <div id="c-gen" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:80px var(--s6) var(--s6);background:var(--bg)">
+      <div class="gen-wrap">
+        <div class="box">
+          <h3>🗄 Generator szafki</h3>
+          <div class="gen-grid">
+            <div class="dimf"><label>Typ szafki</label><select id="gen-cab-run" class="gen-sel" onchange="genSelCab(+this.value)"></select></div>
+            <div class="dimf"><label>Wysokość (mm)</label><input type="number" id="gen-h" value="720" step="1"></div>
+            <div class="dimf"><label>Szerokość (mm)</label><input type="number" id="gen-w" value="600" step="1"></div>
+            <div class="dimf"><label>Głębokość (mm)</label><input type="number" id="gen-d" value="510" step="1"></div>
+            <div class="dimf"><label>Ilość półek</label><input type="number" id="gen-shelves" value="1" min="0" step="1"></div>
+            <div class="dimf"><label>Grubość płyty (mm)</label><input type="number" id="gen-t" value="18" step="0.1"></div>
+          </div>
+          <button class="btn btn-p" onclick="genBuildList()" style="margin-top:var(--s3)">Generuj listę elementów</button>
+        </div>
+        <div class="box">
+          <div style="display:flex;align-items:center;gap:var(--s2)">
+            <h3 style="margin-bottom:0">⚙ Opcje szafek</h3>
+            <button class="btn btn-sec" id="gen-opts-toggle" style="margin-left:auto;font-size:var(--txs);padding:4px 10px" onclick="genToggleOpts()">Pokaż</button>
+          </div>
+          <div id="gen-opts" style="display:none;margin-top:var(--s3)">
+            <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap;margin-bottom:var(--s3)">
+              <div class="dimf" style="flex:1;min-width:180px"><label>Nazwa szafki</label><input type="text" id="gen-cab-name" style="text-align:left" onchange="genRenameCab(this.value)"></div>
+              <button class="btn btn-sec" onclick="genAddCab()">＋ Nowa szafka</button>
+              <button class="btn btn-sec" onclick="genDelCab()">Usuń szafkę</button>
+            </div>
+            <p class="gen-note">Wzory wymiarów: <b>H</b>=wysokość, <b>W</b>=szerokość, <b>D</b>=głębokość, <b>T</b>=grubość płyty, <b>N</b>=ilość półek. Dozwolone + − * / ( ), np. <b>W-2*T</b>. Ilość też może być wzorem (np. <b>N</b>). Szablon TCN jest podpięty na stałe – przy generowaniu podmieniane są w nim tylko wymiary (::UNm DL/DH/DS); brak szablonu = pusty plik TCN.</p>
+            <div class="gen-table-wrap">
+            <table class="gen-table">
+              <thead><tr><th>Element</th><th>Ilość</th><th>DL (wzór)</th><th>DH (wzór)</th><th>Grub. (wzór)</th><th>Szablon TCN</th><th></th></tr></thead>
+              <tbody id="gen-def-tbody"></tbody>
+            </table>
+            </div>
+            <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:flex-end;flex-wrap:wrap">
+              <button class="btn btn-sec" onclick="genDefAddEl()">+ Element</button>
+              <div class="dimf"><label>System kodów</label><select id="gen-base" class="gen-sel" style="width:auto">
+                <option value="16">szesnastkowy (16)</option>
+                <option value="10">dziesiętny (10)</option>
+              </select></div>
+              <button class="btn btn-p" style="margin-left:auto" onclick="genSaveOpts()">Zapisz opcje</button>
+            </div>
+          </div>
+        </div>
+        <div class="box" id="gen-list-box" style="display:none">
+          <h3>Spis elementów</h3>
+          <div class="gen-table-wrap">
+          <table class="gen-table">
+            <thead><tr><th>Element</th><th>DL (mm)</th><th>DH (mm)</th><th>Grub. (mm)</th><th>Szablon</th><th>Plik</th><th>Kod kreskowy</th><th></th></tr></thead>
+            <tbody id="gen-tbody"></tbody>
+          </table>
+          </div>
+          <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:center;flex-wrap:wrap">
+            <button class="btn btn-sec" onclick="genAddRow()">+ Element</button>
+            <button class="btn btn-sec" onclick="genPickOutDir()">📁 Katalog docelowy</button>
+            <span class="fbr-status" id="gen-outdir-status">Brak katalogu</span>
+            <button class="btn btn-p" onclick="genWriteFiles()" style="margin-left:auto">Generuj pliki</button>
+            <button class="btn btn-sec" id="gen-print-btn" onclick="genPrint()" disabled>🖨 Drukuj kody</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="hint" id="hint">Lewy: obrót · Prawy: przesuw · Scroll: zoom</div>
   </div>
@@ -981,6 +1055,8 @@ function switchView(v){
   document.getElementById('tab-'+v).classList.add('act');
   const hint=document.getElementById('hint');
   const cCode=document.getElementById('c-code');
+  const cGen=document.getElementById('c-gen');
+  cGen.style.display='none';
   const btnDims=document.getElementById('btn-dims');
   const btnDia=document.getElementById('btn-dia');
   const btnDep=document.getElementById('btn-dep');
@@ -997,6 +1073,11 @@ function switchView(v){
     hide(btnDims);hide(btnDia);hide(btnDep);hide(btnXray);
     hint.textContent='';
     refreshCodeView();
+  } else if(v==='gen'){
+    c3d.style.display='none';c2d.style.display='none';cCode.style.display='none';
+    cGen.style.display='block';
+    hide(btnDims);hide(btnDia);hide(btnDep);hide(btnXray);
+    hint.textContent='';
   } else if(v==='2d'){
     c3d.style.display='none';c2d.style.display='block';cCode.style.display='none';
     show(btnDims);show(btnDia);show(btnDep);show(btnXray);
@@ -2922,6 +3003,348 @@ document.addEventListener('click',e=>{
   if(e.target.id==='settings-modal')closeSettings();
 });
 
+/* ═══════════════════════════════════════════════════════════════════
+   CABINET GENERATOR (zakładka SZAFKA)
+   ═══════════════════════════════════════════════════════════════════ */
+/* Code 39 – 12 modules per char (narrow=1, wide=2), 1=bar 0=space */
+const C39={
+ '0':'101001101101','1':'110100101011','2':'101100101011','3':'110110010101',
+ '4':'101001101011','5':'110100110101','6':'101100110101','7':'101001011011',
+ '8':'110100101101','9':'101100101101','A':'110101001011','B':'101101001011',
+ 'C':'110110100101','D':'101011001011','E':'110101100101','F':'101101100101',
+ 'G':'101010011011','H':'110101001101','I':'101101001101','J':'101011001101',
+ 'K':'110101010011','L':'101101010011','M':'110110101001','N':'101011010011',
+ 'O':'110101101001','P':'101101101001','Q':'101010110011','R':'110101011001',
+ 'S':'101101011001','T':'101011011001','U':'110010101011','V':'100110101011',
+ 'W':'110011010101','X':'100101101011','Y':'110010110101','Z':'100110110101',
+ '-':'100101011011','.':'110010101101',' ':'100110101101','$':'100100100101',
+ '/':'100100101001','+':'100101001001','%':'101001001001','*':'100101101101'
+};
+function drawCode39(cv,txt){
+  const t=String(txt).toUpperCase();
+  let bits='';
+  for(const ch of ('*'+t+'*')){
+    const p=C39[ch];
+    if(p)bits+=p+'0'; // narrow inter-char space
+  }
+  bits=bits.slice(0,-1);
+  const c=cv.getContext('2d');
+  c.fillStyle='#fff';c.fillRect(0,0,cv.width,cv.height);
+  const quiet=8;
+  const mod=Math.max(1,Math.floor((cv.width-2*quiet)/bits.length));
+  const x0=Math.max(0,Math.floor((cv.width-bits.length*mod)/2));
+  c.fillStyle='#000';
+  const bh=cv.height-16;
+  for(let i=0;i<bits.length;i++)if(bits[i]==='1')c.fillRect(x0+i*mod,3,mod,bh);
+  c.font='10px monospace';c.textAlign='center';
+  c.fillText(t,cv.width/2,cv.height-3);
+}
+
+let genRows=[];       // [{id,name,dl,dh,ds,tpl,fileName}] tpl=FileSystemFileHandle|null
+let genRowId=1;
+let genOutDir=null;   // FileSystemDirectoryHandle (readwrite)
+let genCabinets=[];   // definicje szafek: [{id,name,els:[{name,qty,dl,dh,ds,tpl}]}] wzory jako tekst
+let genCabSel=0;      // indeks wybranej szafki
+let genOpts={base:16};// system liczbowy kodów plików (16 lub 10)
+const GEN_CODE_MAX=10;// maks. długość kodu (cyfr)
+
+function genDefaultCabinet(){
+  return {id:Date.now(),name:'Szafka standardowa',els:[
+    {name:'Bok lewy',     qty:'1',dl:'H',    dh:'D',ds:'T',tpl:null},
+    {name:'Bok prawy',    qty:'1',dl:'H',    dh:'D',ds:'T',tpl:null},
+    {name:'Wieniec dolny',qty:'1',dl:'W-2*T',dh:'D',ds:'T',tpl:null},
+    {name:'Wieniec górny',qty:'1',dl:'W-2*T',dh:'D',ds:'T',tpl:null},
+    {name:'Półka',        qty:'N',dl:'W-2*T',dh:'D',ds:'T',tpl:null},
+  ]};
+}
+function genCab(){return genCabinets[genCabSel]||null;}
+
+/* Bezpieczna ewaluacja wzoru z definicji szafki (H,W,D,T,N + arytmetyka) */
+function genEval(expr,vars){
+  if(expr==null)return null;
+  let s=String(expr).trim().replace(/,/g,'.');
+  if(s==='')return null;
+  if(/^-?\d*\.?\d+$/.test(s))return parseFloat(s);
+  const rep=s.toUpperCase().replace(/[A-Z]+/g,m=>(m in vars&&vars[m]!=null)?'('+vars[m]+')':'@');
+  if(/@/.test(rep))return null;                  // nieznana zmienna
+  if(!/^[\d+\-*/().\s]+$/.test(rep))return null; // tylko bezpieczna matematyka
+  try{
+    const v=Function('"use strict";return('+rep+')')();
+    return (typeof v==='number'&&isFinite(v))?v:null;
+  }catch(_){return null;}
+}
+
+function genBuildList(){
+  const H=parseFloat(document.getElementById('gen-h').value)||0;
+  const W=parseFloat(document.getElementById('gen-w').value)||0;
+  const D=parseFloat(document.getElementById('gen-d').value)||0;
+  const N=Math.max(0,parseInt(document.getElementById('gen-shelves').value)||0);
+  const T=parseFloat(document.getElementById('gen-t').value)||18;
+  if(H<=0||W<=0||D<=0){showToast('Podaj poprawne wymiary szafki',true);return;}
+  const cab=genCab();
+  if(!cab||!cab.els.length){showToast('Brak definicji szafki – dodaj elementy w opcjach',true);return;}
+  const vars={H,W,D,T,N};
+  genRows=[];
+  const bad=[];
+  cab.els.forEach(el=>{
+    const q=Math.max(0,Math.round(genEval(el.qty,vars)??1));
+    const dl=genEval(el.dl,vars),dh=genEval(el.dh,vars),ds=genEval(el.ds,vars)??T;
+    if(dl===null||dh===null||dl<=0||dh<=0){if(q>0)bad.push(el.name);return;}
+    for(let i=1;i<=q;i++)
+      genRows.push({id:genRowId++,name:q>1?el.name+' '+i:el.name,dl,dh,ds,tpl:el.tpl||null,fileName:null});
+  });
+  if(bad.length)showToast('Błędny wzór lub wymiar ≤0: '+bad.join(', '),true);
+  genRenderRows();
+}
+
+function genRenderRows(){
+  const tb=document.getElementById('gen-tbody');
+  tb.innerHTML=genRows.map(r=>`<tr>
+    <td><input type="text" value="${r.name}" onchange="genUpd(${r.id},'name',this.value)"></td>
+    <td><input type="number" step="0.1" value="${fvI(r.dl)}" onchange="genUpd(${r.id},'dl',this.value)"></td>
+    <td><input type="number" step="0.1" value="${fvI(r.dh)}" onchange="genUpd(${r.id},'dh',this.value)"></td>
+    <td><input type="number" step="0.1" value="${fvI(r.ds)}" onchange="genUpd(${r.id},'ds',this.value)"></td>
+    <td style="font-size:var(--txs);color:${r.tpl?'var(--txt)':'var(--faint)'};max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.tpl?.name||''}">${r.tpl?.name||'pusty TCN'}</td>
+    <td style="white-space:nowrap;color:${r.fileName?'var(--ok)':'var(--faint)'}">${r.fileName||'—'}</td>
+    <td>${r.fileName?`<canvas id="gen-bc-${r.id}" width="200" height="50" style="background:#fff;border-radius:3px;display:block"></canvas>`:'<span style="color:var(--faint)">—</span>'}</td>
+    <td class="td-del"><button class="btn-del" onclick="genDelRow(${r.id})">✕</button></td>
+  </tr>`).join('');
+  genRows.forEach(r=>{
+    if(r.fileName){
+      const cv=document.getElementById('gen-bc-'+r.id);
+      // Kod kreskowy = pełna nazwa pliku + '%' (terminator skanera), np. 1A.TCN%
+      if(cv)drawCode39(cv,r.fileName+'%');
+    }
+  });
+  document.getElementById('gen-list-box').style.display=genRows.length?'':'none';
+  document.getElementById('gen-print-btn').disabled=!genRows.some(r=>r.fileName);
+}
+
+function genUpd(id,field,val){
+  const r=genRows.find(r=>r.id===id);if(!r)return;
+  if(field==='name'){r.name=val;return;}
+  const v=parseFloat(val);if(isNaN(v))return;
+  r[field]=v;
+  // zmiana wymiarów unieważnia już wygenerowany plik
+  if(r.fileName){r.fileName=null;genRenderRows();}
+}
+function genDelRow(id){genRows=genRows.filter(r=>r.id!==id);genRenderRows();}
+function genAddRow(){
+  const D=parseFloat(document.getElementById('gen-d').value)||500;
+  const T=parseFloat(document.getElementById('gen-t').value)||18;
+  genRows.push({id:genRowId++,name:'Element',tpl:null,dl:400,dh:D,ds:T,fileName:null});
+  genRenderRows();
+}
+
+/* ── Opcje szafek: definicje, wzory, szablony ───────────────────── */
+function genToggleOpts(){
+  const p=document.getElementById('gen-opts');
+  const vis=p.style.display!=='none';
+  p.style.display=vis?'none':'';
+  document.getElementById('gen-opts-toggle').textContent=vis?'Pokaż':'Ukryj';
+}
+function genRenderCabSel(){
+  const sel=document.getElementById('gen-cab-run');
+  sel.innerHTML=genCabinets.map((c,i)=>`<option value="${i}"${i===genCabSel?' selected':''}>${c.name}</option>`).join('');
+  const nameInp=document.getElementById('gen-cab-name');
+  if(nameInp)nameInp.value=genCab()?.name||'';
+  const baseSel=document.getElementById('gen-base');
+  if(baseSel)baseSel.value=String(genOpts.base===10?10:16);
+  genRenderDefs();
+}
+function genSelCab(i){genCabSel=Math.max(0,Math.min(genCabinets.length-1,i));genRenderCabSel();}
+function genAddCab(){
+  genCabinets.push({id:Date.now(),name:'Nowa szafka',els:[]});
+  genCabSel=genCabinets.length-1;
+  genRenderCabSel();
+}
+function genDelCab(){
+  if(genCabinets.length<=1){showToast('Musi zostać przynajmniej jedna szafka',true);return;}
+  if(!confirm(`Usunąć szafkę „${genCab()?.name}”?`))return;
+  genCabinets.splice(genCabSel,1);
+  genCabSel=0;
+  genRenderCabSel();
+}
+function genRenameCab(v){
+  const c=genCab();if(!c)return;
+  c.name=v.trim()||c.name;
+  genRenderCabSel();
+}
+function genRenderDefs(){
+  const tb=document.getElementById('gen-def-tbody');
+  if(!tb)return;
+  const c=genCab();
+  tb.innerHTML=(c?.els||[]).map((el,i)=>`<tr>
+    <td><input type="text" value="${el.name}" onchange="genDefUpd(${i},'name',this.value)"></td>
+    <td><input type="text" style="min-width:50px;width:60px;text-align:center" value="${el.qty}" onchange="genDefUpd(${i},'qty',this.value)"></td>
+    <td><input type="text" style="min-width:80px;width:95px;text-align:center" value="${el.dl}" onchange="genDefUpd(${i},'dl',this.value)"></td>
+    <td><input type="text" style="min-width:80px;width:95px;text-align:center" value="${el.dh}" onchange="genDefUpd(${i},'dh',this.value)"></td>
+    <td><input type="text" style="min-width:50px;width:60px;text-align:center" value="${el.ds}" onchange="genDefUpd(${i},'ds',this.value)"></td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-sec" style="font-size:var(--txs);padding:3px 8px" onclick="genDefPickTpl(${i})" title="Wybierz plik szablonu TCN">📄</button>
+      <span style="font-size:var(--txs);color:${el.tpl?'var(--ok)':'var(--faint)'}" title="${el.tpl?.name||''}">${el.tpl?.name||'pusty TCN'}</span>
+    </td>
+    <td class="td-del"><button class="btn-del" onclick="genDefDelEl(${i})">✕</button></td>
+  </tr>`).join('');
+}
+function genDefUpd(i,f,v){const c=genCab();if(c?.els[i])c.els[i][f]=f==='name'?v:v.trim();}
+function genDefDelEl(i){const c=genCab();if(!c)return;c.els.splice(i,1);genRenderDefs();}
+function genDefAddEl(){
+  const c=genCab();if(!c)return;
+  c.els.push({name:'Element',qty:'1',dl:'W-2*T',dh:'D',ds:'T',tpl:null});
+  genRenderDefs();
+}
+async function genDefPickTpl(i){
+  const c=genCab();if(!c?.els[i])return;
+  if(!('showOpenFilePicker' in window)){showToast('Przeglądarka nie obsługuje wyboru pliku',true);return;}
+  try{
+    const [h]=await window.showOpenFilePicker({types:[{description:'TCN files',accept:{'text/plain':['.TCN','.tcn']}}]});
+    c.els[i].tpl=h;
+    genRenderDefs();
+  }catch(e){if(e.name!=='AbortError')console.error(e);}
+}
+async function genSaveOpts(){
+  const baseSel=document.getElementById('gen-base');
+  genOpts.base=(+baseSel.value===10)?10:16;
+  try{
+    await IDB.set('genCabinets',genCabinets); // uchwyty plików zapisują się razem z definicją
+    await IDB.set('genOpts',genOpts);
+    showToast('✓ Zapisano opcje szafek');
+  }catch(e){showToast('Błąd zapisu opcji: '+e.message,true);}
+}
+
+async function genPickOutDir(){
+  if(!('showDirectoryPicker' in window)){showToast('Przeglądarka nie obsługuje wyboru katalogu',true);return;}
+  try{
+    const h=await window.showDirectoryPicker({mode:'readwrite'});
+    genOutDir=h;
+    await IDB.set('genOutDir',h);
+    document.getElementById('gen-outdir-status').textContent=h.name;
+  }catch(e){if(e.name!=='AbortError')console.error(e);}
+}
+
+/* Czyta szablon z uchwytu pliku; cache przekazywany per operacja zapisu */
+async function genGetTplText(h,cache){
+  if(!h)return null;
+  if(cache.has(h))return cache.get(h);
+  let txt=null;
+  try{
+    let p=await h.queryPermission({mode:'read'});
+    if(p!=='granted')p=await h.requestPermission({mode:'read'});
+    if(p==='granted')txt=await (await h.getFile()).text();
+  }catch(e){console.warn('szablon '+(h.name||'?')+':',e);}
+  cache.set(h,txt);
+  return txt;
+}
+
+/* Podmienia wymiary w szablonie TCN; bez szablonu buduje minimalny plik */
+function genMakeTCN(tplTxt,r){
+  if(tplTxt&&/::UNm/i.test(tplTxt)){
+    const sep=/DL=\d+,\d/.test(tplTxt)?',':'.';
+    const f=v=>{const s=parseFloat((+v).toFixed(4)).toString();return sep===','?s.replace('.',','):s;};
+    return tplTxt.replace(/(::UNm\s+DL=)[^\s]+(\s+DH=)[^\s]+(\s+DS=)[^\s]+/i,
+      `$1${f(r.dl)}$2${f(r.dh)}$3${f(r.ds)}`);
+  }
+  const f=v=>parseFloat((+v).toFixed(4)).toString();
+  return ['TPA\\ALBATROS\\EDICAD\\02.00:1333:r0w0h0s4','::SIDE=1;3;4;5;6;',
+    `::UNm DL=${f(r.dl)} DH=${f(r.dh)} DS=${f(r.ds)}`,
+    "'tcn version=2.4.14","'code=ansi",
+    'SIDE#0{','}SIDE',
+    'SIDE#1{','$=TOP','}SIDE','SIDE#3{','$=FRONT','}SIDE',
+    'SIDE#4{','$=RIGHT','}SIDE','SIDE#5{','$=BACK','}SIDE','SIDE#6{','$=LEFT','}SIDE'
+  ].join('\r\n');
+}
+
+async function genWriteFiles(){
+  if(!genRows.length){showToast('Najpierw wygeneruj listę elementów',true);return;}
+  const todo=genRows.filter(r=>!r.fileName);
+  if(!todo.length){showToast('Wszystkie elementy mają już pliki',true);return;}
+  if(!genOutDir){await genPickOutDir();if(!genOutDir)return;}
+  try{
+    if((await genOutDir.queryPermission({mode:'readwrite'}))!=='granted'){
+      if((await genOutDir.requestPermission({mode:'readwrite'}))!=='granted'){
+        showToast('Brak uprawnień zapisu do katalogu',true);return;
+      }
+    }
+  }catch(e){showToast('Brak dostępu do katalogu: '+e.message,true);return;}
+  const tplCache=new Map();
+  const tplFail=new Set();
+  // Unikalne nazwy: kolejne liczby (system 10/16, maks 10 cyfr) od max numeru w katalogu
+  const base=genOpts.base===10?10:16;
+  const reCode=base===16?/^([0-9A-F]{1,10})\.tcn$/i:/^(\d{1,10})\.tcn$/i;
+  let maxN=0;
+  try{
+    for await(const [name,fh] of genOutDir.entries()){
+      const m=name.match(reCode);
+      if(fh.kind==='file'&&m)maxN=Math.max(maxN,parseInt(m[1],base));
+    }
+  }catch(e){}
+  let n=maxN,written=0;
+  for(const r of todo){
+    n++;
+    const code=n.toString(base).toUpperCase();
+    if(code.length>GEN_CODE_MAX){showToast('Przekroczono maks. '+GEN_CODE_MAX+' cyfr kodu',true);break;}
+    const tplTxt=await genGetTplText(r.tpl,tplCache);
+    if(r.tpl&&tplTxt===null)tplFail.add(r.tpl.name||'?');
+    const txt=genMakeTCN(tplTxt,r);
+    try{
+      const fh=await genOutDir.getFileHandle(code+'.TCN',{create:true});
+      const w=await fh.createWritable();
+      await w.write(txt);await w.close();
+      r.fileName=code+'.TCN'; // plik bez '%'; '%' tylko w kodzie kreskowym
+      written++;
+    }catch(e){showToast('Błąd zapisu '+code+'.TCN: '+e.message,true);break;}
+  }
+  genRenderRows();
+  if(tplFail.size)showToast('Nie odczytano szablonów (użyto pustych): '+[...tplFail].join(', '),true);
+  if(written)showToast(`✓ Zapisano ${written} plików w „${genOutDir.name}”`);
+  // Odśwież przeglądarkę plików jeśli patrzy na ten sam katalog
+  try{if(brDirHandle&&genOutDir.isSameEntry&&await genOutDir.isSameEntry(brDirHandle))brLoadDir();}catch(e){}
+}
+
+function genPrint(){
+  const rows=genRows.filter(r=>r.fileName);
+  if(!rows.length)return;
+  const w=window.open('','_blank');
+  if(!w){showToast('Przeglądarka zablokowała okno drukowania',true);return;}
+  const items=rows.map(r=>{
+    const cv=document.getElementById('gen-bc-'+r.id);
+    const url=cv?cv.toDataURL():'';
+    return `<div class="lbl"><img src="${url}"><div>${r.name} · ${fvI(r.dl)}×${fvI(r.dh)}×${fvI(r.ds)}</div></div>`;
+  }).join('');
+  w.document.write(`<!DOCTYPE html><html><head><title>Etykiety</title><style>
+    body{font-family:sans-serif;margin:10mm}
+    .lbl{display:inline-block;border:1px dashed #999;padding:6px 10px;margin:4px;text-align:center;font-size:11px}
+    .lbl img{display:block;margin:0 auto 4px}
+  </style></head><body>${items}</body></html>`);
+  w.document.close();
+  setTimeout(()=>{try{w.print();}catch(e){}},400);
+}
+
+async function genInitFromIDB(){
+  try{
+    const d=await IDB.get('genOutDir').catch(()=>null);
+    if(d){genOutDir=d;document.getElementById('gen-outdir-status').textContent=d.name;}
+    const o=await IDB.get('genOpts').catch(()=>null);
+    if(o&&(o.base===10||o.base===16))genOpts=o;
+    const cabs=await IDB.get('genCabinets').catch(()=>null);
+    if(Array.isArray(cabs)&&cabs.length){
+      genCabinets=cabs;
+    }else{
+      genCabinets=[genDefaultCabinet()];
+      // migracja szablonów z poprzedniej wersji (bok/wieniec/polka)
+      const mig={bok:['Bok lewy','Bok prawy'],wieniec:['Wieniec dolny','Wieniec górny'],polka:['Półka']};
+      for(const k in mig){
+        const h=await IDB.get('genTpl_'+k).catch(()=>null);
+        if(h)genCabinets[0].els.forEach(el=>{if(mig[k].includes(el.name))el.tpl=h;});
+      }
+    }
+  }catch(e){console.warn('genInitFromIDB:',e);}
+  if(!genCabinets.length)genCabinets=[genDefaultCabinet()];
+  genCabSel=0;
+  genRenderCabSel();
+}
+
 (function(){
   const tog=document.querySelector('[data-theme-toggle]'),root=document.documentElement;
   let d='dark';root.setAttribute('data-theme',d);
@@ -2943,6 +3366,7 @@ window.addEventListener('load',()=>{
   initThree();setupFileLoading();setLoadedState(false,'');renderOps();draw2D();
   initResizer();initBarcodeSearch();
   loadToolSettings().then(()=>brInitFromIDB());
+  genInitFromIDB();
   window.addEventListener('resize',()=>{if(brFiltered.length)brBuildGrid();});
 });
 </script>
