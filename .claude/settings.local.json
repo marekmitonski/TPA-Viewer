@@ -1,7 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(awk '/Xray overlay on TOP view/,/if\\\\\\(showDims/ {print NR\": \"$0}' /c/Users/Showroom/dev/TPA-Viewer/index.html)"
+      "Bash(awk '/Xray overlay on TOP view/,/if\\\\\\(showDims/ {print NR\": \"$0}' /c/Users/Showroom/dev/TPA-Viewer/index.html)",
+      "Bash(node --check /tmp/claude-1000/-home-marek-dev-TPA-Viewer/4580cd4f-c69d-45c6-9fd3-71b98a5fc8f3/scratchpad/main.js)",
+      "Bash(awk 'NR==379{print NR\": [\"$0\"]\"} NR==3392{print NR\": [\"$0\"]\"}' index.html)",
+      "Bash(node -e ' *)",
+      "Read(//home/marek/.cache/**)",
+      "Bash(node -e \"require.resolve\\('playwright'\\)\")",
+      "Bash(npm init *)",
+      "Bash(npm i *)",
+      "Bash(node check.js)",
+      "Bash(node check2.js)",
+      "Bash(node check3.js)",
+      "Bash(python3 -m http.server 8177)",
+      "Bash(sed -i \"s|file:///home/marek/dev/TPA-Viewer/index.html|http://localhost:8177/index.html|\" check4.js)",
+      "Bash(node check4.js)",
+      "Bash(kill %1)"
     ]
   }
 }

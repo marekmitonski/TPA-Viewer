@@ -21,6 +21,10 @@ header{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) var(--s6)
 .hact{display:flex;gap:var(--s2);margin-left:auto;align-items:center;flex-wrap:wrap}
 .btn{display:inline-flex;align-items:center;gap:var(--s1);padding:var(--s2) var(--s4);border-radius:var(--rmd);font-size:var(--tsm);font-weight:500;border:1px solid transparent}
 .btn-p{background:var(--pri);color:#fff}.btn-p:hover{background:var(--prihov)}
+/* App mode switcher (TPA Viewer / Generator szafek) */
+.mtabs{display:flex;gap:2px;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rlg);padding:3px}
+.mtab{padding:var(--s1) var(--s3);border-radius:calc(var(--rlg) - 3px);font-size:var(--tsm);font-weight:600;color:var(--muted)}.mtab:hover{color:var(--txt)}.mtab.act{background:var(--pri);color:#fff}
+body[data-mode="gen"] .viewer-only{display:none!important}
 .btn-ic{width:34px;height:34px;padding:0;justify-content:center;border-radius:var(--rmd);background:var(--surfoff);border:1px solid var(--bord)}.btn-ic:hover{background:var(--surfdyn)}
 .btn-sec{background:var(--surfoff);border:1px solid var(--bord)}.btn-sec:hover{background:var(--surfdyn)}
 .btn-tog{display:inline-flex;align-items:center;line-height:1;padding:var(--s1) var(--s3);border-radius:var(--rmd);font-size:var(--txs);font-weight:600;background:var(--surfoff);border:1px solid var(--bord);color:var(--muted)}.btn-tog.on{background:var(--pri);color:#fff;border-color:var(--pri)}
@@ -133,7 +137,9 @@ main{display:flex;overflow:hidden}
 .pt-row input{flex:1;background:var(--surfoff);border:1px solid var(--bord);border-radius:var(--rsm);padding:2px var(--s1);font-size:var(--txs);text-align:right;width:60px}
 .pt-del{padding:1px 5px;border-radius:var(--rsm);font-size:10px;background:color-mix(in oklch,var(--warn) 12%,var(--surfoff));border:1px solid color-mix(in oklch,var(--warn) 30%,var(--bord));color:var(--warn);cursor:pointer}
 /* ── CABINET GENERATOR ───────────────────────────────────────────── */
-.gen-wrap{max-width:1020px;margin:0 auto}
+#gen-page{flex:1;overflow-y:auto;padding:var(--s6);background:var(--bg);display:none}
+#gen-page::-webkit-scrollbar{width:6px}#gen-page::-webkit-scrollbar-thumb{background:var(--bord);border-radius:999px}
+.gen-wrap{width:100%;margin:0 auto}
 .gen-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--s2)}
 .gen-note{font-size:var(--txs);color:var(--muted);margin-bottom:var(--s3)}
 .gen-sel{width:100%;background:var(--bg);border:1px solid var(--bord);border-radius:var(--rsm);padding:var(--s2);font-size:var(--tsm);color:var(--txt)}.gen-sel:focus{outline:none;border-color:var(--pri)}
@@ -151,17 +157,21 @@ main{display:flex;overflow:hidden}
 <header>
   <div class="logo">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="1" y="6" width="22" height="12" rx="2" fill="currentColor" opacity="0.15" stroke="currentColor" stroke-width="1.5"/><circle cx="5.5" cy="12" r="1.8" fill="currentColor"/><circle cx="18.5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>
-    TPA Viewer
+    TPA
   </div>
-  <span class="badge file-badge hidden" id="file-name-badge" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-  <span class="badge" id="dim-lbl" style="display:none">—</span>
-  <span class="badge" id="cnt-lbl" style="display:none">0 operacji</span>
+  <nav class="mtabs">
+    <button class="mtab act" id="mode-viewer" onclick="setAppMode('viewer')">TPA Viewer</button>
+    <button class="mtab" id="mode-gen" onclick="setAppMode('gen')">Generator szafek</button>
+  </nav>
+  <span class="badge file-badge hidden viewer-only" id="file-name-badge" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+  <span class="badge viewer-only" id="dim-lbl" style="display:none">—</span>
+  <span class="badge viewer-only" id="cnt-lbl" style="display:none">0 operacji</span>
   <div class="hact">
     <input id="fileInput" type="file" accept=".tcn,.TCN,.txt" class="hidden"/>
-    <button class="btn btn-sec" onclick="newFile()">Nowy</button>
-    <button class="btn btn-sec" id="saveBtn" onclick="saveTCN()" disabled>Zapisz</button>
-    <button class="btn btn-sec" id="saveAsBtn" onclick="saveTCNAs()" disabled>Zapisz jako…</button>
-    <button class="btn-ic" onclick="openSettings()" title="Ustawienia narzędzi">
+    <button class="btn btn-sec viewer-only" onclick="newFile()">Nowy</button>
+    <button class="btn btn-sec viewer-only" id="saveBtn" onclick="saveTCN()" disabled>Zapisz</button>
+    <button class="btn btn-sec viewer-only" id="saveAsBtn" onclick="saveTCNAs()" disabled>Zapisz jako…</button>
+    <button class="btn-ic" onclick="openSettings()" title="Ustawienia">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
     </button>
     <div style="display:flex;gap:2px">
@@ -215,7 +225,6 @@ main{display:flex;overflow:hidden}
       <button class="tbtn" id="tab-right" onclick="switchView('right')">RIGHT</button>
       <button class="tbtn" id="tab-left" onclick="switchView('left')">LEFT</button>
       <button class="tbtn" id="tab-code" onclick="switchView('code')">CODE</button>
-      <button class="tbtn" id="tab-gen" onclick="switchView('gen')">SZAFKA</button>
     </div>
     <div style="position:absolute;top:var(--s4);right:var(--s4);z-index:15;display:flex;gap:4px;align-items:center" id="top-bar">
       <button class="btn-tog on" id="btn-dims" onclick="toggleDims()" style="display:none">📐 Wymiary</button>
@@ -227,64 +236,6 @@ main{display:flex;overflow:hidden}
     <canvas id="c2d"></canvas>
     <div id="c-code" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:80px var(--s4) var(--s4);background:var(--bg)">
       <pre id="code-content" style="font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.6;color:var(--txt);background:var(--surf2);padding:var(--s4);border-radius:var(--rlg);border:1px solid var(--bord);white-space:pre-wrap;word-break:break-all;margin:0;min-height:calc(100% - var(--s8))"></pre>
-    </div>
-    <div id="c-gen" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:80px var(--s6) var(--s6);background:var(--bg)">
-      <div class="gen-wrap">
-        <div class="box">
-          <h3>🗄 Rodzaj szafki</h3>
-          <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap">
-            <div class="dimf" style="flex:1;min-width:220px"><label>Wybierz szafkę</label><select id="gen-cab-run" class="gen-sel" onchange="genSelCab(+this.value)"></select></div>
-            <button class="btn btn-sec" onclick="genAddCab()">＋ Dodaj szafkę</button>
-            <button class="btn btn-sec" onclick="genDelCab()">− Usuń szafkę</button>
-            <button class="btn btn-sec" id="gen-opts-toggle" onclick="genToggleOpts()">⚙ Ustawienia</button>
-          </div>
-        </div>
-        <div class="box" id="gen-opts-box" style="display:none">
-          <h3 id="gen-opts-title">⚙ Ustawienia szafki</h3>
-          <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap;margin-bottom:var(--s3)">
-            <div class="dimf" style="flex:1;min-width:180px"><label>Nazwa szafki</label><input type="text" id="gen-cab-name" style="text-align:left" onchange="genRenameCab(this.value)"></div>
-            <div class="dimf"><label>System kodów</label><select id="gen-base" class="gen-sel" style="width:auto" onchange="genBaseChanged()">
-              <option value="16">szesnastkowy (16)</option>
-              <option value="10">dziesiętny (10)</option>
-            </select></div>
-          </div>
-          <p class="gen-note">Wzory wymiarów: <b>H</b>=wysokość, <b>W</b>=szerokość, <b>D</b>=głębokość, <b>T</b>=grubość płyty, <b>N</b>=ilość półek. Dozwolone + − * / ( ), np. <b>W-2*T</b>. Ilość też może być wzorem (np. <b>N</b>). Szablon TCN jest podpięty na stałe – przy generowaniu podmieniane są w nim tylko wymiary (::UNm DL/DH/DS); brak szablonu = pusty plik TCN. Zmiany zapisują się automatycznie.</p>
-          <div class="gen-table-wrap">
-          <table class="gen-table">
-            <thead><tr><th>Element</th><th>Ilość</th><th>DL (wzór)</th><th>DH (wzór)</th><th>Grub. (wzór)</th><th>Szablon TCN</th><th></th></tr></thead>
-            <tbody id="gen-def-tbody"></tbody>
-          </table>
-          </div>
-          <button class="btn btn-sec" onclick="genDefAddEl()" style="margin-top:var(--s3)">+ Dodaj element</button>
-        </div>
-        <div class="box">
-          <h3>Wymiary i generowanie</h3>
-          <div class="gen-grid" style="grid-template-columns:repeat(5,1fr)">
-            <div class="dimf"><label>Wysokość (mm)</label><input type="number" id="gen-h" value="720" step="1"></div>
-            <div class="dimf"><label>Szerokość (mm)</label><input type="number" id="gen-w" value="600" step="1"></div>
-            <div class="dimf"><label>Głębokość (mm)</label><input type="number" id="gen-d" value="510" step="1"></div>
-            <div class="dimf"><label>Ilość półek</label><input type="number" id="gen-shelves" value="1" min="0" step="1"></div>
-            <div class="dimf"><label>Grubość płyty (mm)</label><input type="number" id="gen-t" value="18" step="0.1"></div>
-          </div>
-          <button class="btn btn-p" onclick="genBuildList()" style="margin-top:var(--s3)">Generuj listę elementów</button>
-        </div>
-        <div class="box" id="gen-list-box" style="display:none">
-          <h3>Spis elementów</h3>
-          <div class="gen-table-wrap">
-          <table class="gen-table">
-            <thead><tr><th>Element</th><th>DL (mm)</th><th>DH (mm)</th><th>Grub. (mm)</th><th>Szablon</th><th>Plik</th><th>Kod kreskowy</th><th></th></tr></thead>
-            <tbody id="gen-tbody"></tbody>
-          </table>
-          </div>
-          <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:center;flex-wrap:wrap">
-            <button class="btn btn-sec" onclick="genAddRow()">+ Element</button>
-            <button class="btn btn-sec" onclick="genPickOutDir()">📁 Katalog docelowy</button>
-            <span class="fbr-status" id="gen-outdir-status">Brak katalogu</span>
-            <button class="btn btn-p" onclick="genWriteFiles()" style="margin-left:auto">Generuj pliki</button>
-            <button class="btn btn-sec" id="gen-print-btn" onclick="genPrint()" disabled>🖨 Drukuj kody</button>
-          </div>
-        </div>
-      </div>
     </div>
     <div class="hint" id="hint">Lewy: obrót · Prawy: przesuw · Scroll: zoom</div>
   </div>
@@ -332,14 +283,94 @@ main{display:flex;overflow:hidden}
       </div>
     </div>
   </aside>
+  <!-- GENERATOR SZAFEK (pełna szerokość, tryb "gen") -->
+  <div id="gen-page">
+    <div class="gen-wrap">
+      <nav class="mtabs" style="display:inline-flex;margin-bottom:var(--s4)">
+        <button class="mtab act" id="gen-mode-run" onclick="genSetMode('run')">Generuj szafki</button>
+        <button class="mtab" id="gen-mode-edit" onclick="genSetMode('edit')">Edytuj szafki</button>
+      </nav>
+      <div class="box">
+        <h3>🗄 Rodzaj szafki</h3>
+        <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap">
+          <div class="dimf" style="flex:1;min-width:220px;max-width:420px"><label>Wybierz szafkę</label><select id="gen-cab-run" class="gen-sel" onchange="genSelCab(+this.value)"></select></div>
+          <span id="gen-edit-btns" style="display:none;gap:var(--s2);flex-wrap:wrap">
+            <button class="btn btn-sec" onclick="genAddCab()">＋ Dodaj szafkę</button>
+            <button class="btn btn-sec" onclick="genDelCab()">− Usuń szafkę</button>
+            <button class="btn btn-sec" id="gen-opts-toggle" onclick="genToggleOpts()">✎ Edytuj szafkę</button>
+          </span>
+        </div>
+      </div>
+      <div class="box" id="gen-opts-box" style="display:none">
+        <h3 id="gen-opts-title">⚙ Ustawienia szafki</h3>
+        <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap;margin-bottom:var(--s3)">
+          <div class="dimf" style="flex:1;min-width:180px;max-width:360px"><label>Nazwa szafki</label><input type="text" id="gen-cab-name" style="text-align:left" onchange="genRenameCab(this.value)"></div>
+          <div class="dimf"><label>Kod szafki</label><input type="text" id="gen-cab-code" style="text-align:left;width:120px" onchange="genCabCodeChanged(this.value)"></div>
+          <div class="dimf"><label>System kodów</label><select id="gen-base" class="gen-sel" style="width:auto" onchange="genBaseChanged()">
+            <option value="16">szesnastkowy (16)</option>
+            <option value="10">dziesiętny (10)</option>
+          </select></div>
+        </div>
+        <p class="gen-note">Wzory wymiarów: <b>H</b>=wysokość, <b>W</b>=szerokość, <b>D</b>=głębokość, <b>T</b>=grubość płyty + parametry własne poniżej (litera zmiennej przydzielana automatycznie). Dozwolone + − * / ( ), np. <b>W-2*T</b>. Ilość też może być wzorem. Szablon TCN jest podpięty na stałe – przy generowaniu podmieniane są w nim tylko wymiary (::UNm DL/DH/DS); brak szablonu = pusty plik TCN. Zmiany zapisują się automatycznie.</p>
+        <div style="margin-bottom:var(--s4)">
+          <div class="ogt" style="margin-bottom:var(--s2)">Parametry szafki (podstawowe H/W/D/T + własne)</div>
+          <table class="gen-table" style="width:auto">
+            <thead><tr><th>Nazwa parametru</th><th>Zmienna</th><th>Wartość domyślna</th><th></th></tr></thead>
+            <tbody id="gen-par-def-tbody"></tbody>
+          </table>
+          <button class="btn btn-sec" onclick="genAddParam()" style="margin-top:var(--s2);font-size:var(--txs);padding:4px 10px">＋ Dodaj parametr</button>
+        </div>
+        <div class="gen-table-wrap">
+        <table class="gen-table">
+          <thead><tr><th>Kolor płyty</th><th>Słoje</th><th>Długość (wzór)</th><th>Szerokość (wzór)</th><th>Ilość</th><th>Nazwa</th><th>Opis</th><th>Dł. front</th><th>Dł. tył</th><th>Szer. lewa</th><th>Szer. prawa</th><th>Grub. (wzór)</th><th>Szablon TCN</th><th></th></tr></thead>
+          <tbody id="gen-def-tbody"></tbody>
+        </table>
+        </div>
+        <button class="btn btn-sec" onclick="genDefAddEl()" style="margin-top:var(--s3)">+ Dodaj element</button>
+      </div>
+      <div class="box" id="gen-dims-box">
+        <h3>Wymiary i generowanie</h3>
+        <div class="gen-grid" id="gen-dims-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,190px))"></div>
+        <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:center;flex-wrap:wrap">
+          <button class="btn btn-p" onclick="genBuildList()">Generuj listę formatek</button>
+          <span class="gen-note" style="margin:0">Parametry dodasz i usuniesz w trybie „Edytuj szafki”.</span>
+        </div>
+      </div>
+      <div class="box" id="gen-list-box" style="display:none">
+        <h3>Formatki</h3>
+        <div class="gen-table-wrap">
+        <table class="gen-table">
+          <thead><tr><th>Kolor płyty</th><th>Słoje</th><th>Długość</th><th>Szerokość</th><th>Ilość</th><th>Nazwa</th><th>Kod szafki</th><th>Opis</th><th>Dł. front</th><th>Dł. tył</th><th>Szer. lewa</th><th>Szer. prawa</th><th>Plik</th><th>Kod kreskowy</th><th></th></tr></thead>
+          <tbody id="gen-tbody"></tbody>
+        </table>
+        </div>
+        <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:center;flex-wrap:wrap">
+          <button class="btn btn-sec" onclick="genAddRow()">+ Formatka</button>
+          <span class="fbr-status" id="gen-outdir-status">Pliki TCN trafią do katalogu z paska plików</span>
+          <button class="btn btn-p" onclick="genWriteFiles()" style="margin-left:auto">Generuj pliki</button>
+          <button class="btn btn-sec" id="gen-print-btn" onclick="genPrint()" disabled>🖨 Drukuj kody</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
 <div class="modal-bg hidden" id="settings-modal" onclick="e=>e.target===this&&closeSettings()">
   <div class="modal">
     <div class="modal-head">
-      <h2>⚙ Ustawienia narzędzi</h2>
+      <h2>⚙ Ustawienia</h2>
       <button class="modal-close" onclick="closeSettings()">✕</button>
     </div>
     <div class="modal-body">
+      <div class="modal-section">
+        <h3>💾 Katalog ustawień (synchronizacja / git)</h3>
+        <p>Podstawowa lokalizacja to <b>katalog pliku HTML aplikacji</b> – leżący obok <b>ustawienia.json</b> (+ <b>szablony/</b>) wczytuje się automatycznie przy starcie. Aby zmiany zapisywały się automatycznie (albo żeby użyć innej lokalizacji), wskaż katalog przyciskiem – przeglądarka wymaga jednorazowego wyboru. Całość ustawień (szafki, parametry, narzędzia frezów/piłek, skaner) zapisuje się wtedy przy każdej zmianie i można ją przenosić gitem między komputerami.</p>
+        <div style="display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap">
+          <button class="btn btn-sec" onclick="genPickCfgDir()" style="font-size:var(--txs);padding:5px 8px">📁 Wybierz katalog</button>
+          <span class="fbr-status" id="gen-cfgdir-status">Brak katalogu</span>
+          <button class="btn btn-sec" onclick="genExportCfg(true)" style="font-size:var(--txs);padding:5px 8px">⬇ Zapisz teraz</button>
+          <button class="btn btn-sec" onclick="genImportCfg()" style="font-size:var(--txs);padding:5px 8px">⬆ Wczytaj z katalogu</button>
+        </div>
+      </div>
       <div class="modal-section">
         <h3>Skaner kodów kreskowych</h3>
         <p>Maksymalny czas między znakami (ms). Skaner wysyła znaki szybciej niż człowiek. Zmniejsz jeśli znaki trafiają do aktywnych pól zamiast wyszukiwarki.</p>
@@ -706,6 +737,7 @@ async function promptNewTools(newMill,newSaw){
   }
   if(changed){
     await IDB.set('toolSettings',toolSettings);
+    genExportCfg(false); // auto-zapis całości do katalogu ustawień
     // Refresh everything so new tools appear in selects and 3D/2D
     renderOps();buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
   }
@@ -1045,16 +1077,29 @@ function onC3Click(e){
 }
 function animate(){requestAnimationFrame(animate);if(controls)controls.update();if(ren&&scene&&cam)ren.render(scene,cam);}
 
+/* ─── APP MODE (TPA Viewer / Generator szafek) ───────────────────── */
+let appMode='viewer';
+function setAppMode(m){
+  appMode=(m==='gen')?'gen':'viewer';
+  document.body.dataset.mode=appMode;
+  document.getElementById('mode-viewer').classList.toggle('act',appMode==='viewer');
+  document.getElementById('mode-gen').classList.toggle('act',appMode==='gen');
+  document.getElementById('va').style.display=appMode==='viewer'?'':'none';
+  document.querySelector('aside.sb').style.display=appMode==='viewer'?'':'none';
+  document.getElementById('gen-page').style.display=appMode==='gen'?'block':'none';
+  IDB.set('appMode',appMode).catch(()=>{});
+  if(appMode==='viewer')onResize();
+}
+
 /* ─── VIEWS ──────────────────────────────────────────────────────── */
 function switchView(v){
+  if(v==='gen'){setAppMode('gen');return;} // legacy (dawna zakładka SZAFKA)
   curView=v;
   IDB.set('lastView',v).catch(()=>{});
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('act'));
   document.getElementById('tab-'+v).classList.add('act');
   const hint=document.getElementById('hint');
   const cCode=document.getElementById('c-code');
-  const cGen=document.getElementById('c-gen');
-  cGen.style.display='none';
   const btnDims=document.getElementById('btn-dims');
   const btnDia=document.getElementById('btn-dia');
   const btnDep=document.getElementById('btn-dep');
@@ -1071,11 +1116,6 @@ function switchView(v){
     hide(btnDims);hide(btnDia);hide(btnDep);hide(btnXray);
     hint.textContent='';
     refreshCodeView();
-  } else if(v==='gen'){
-    c3d.style.display='none';c2d.style.display='none';cCode.style.display='none';
-    cGen.style.display='block';
-    hide(btnDims);hide(btnDia);hide(btnDep);hide(btnXray);
-    hint.textContent='';
   } else if(v==='2d'){
     c3d.style.display='none';c2d.style.display='block';cCode.style.display='none';
     show(btnDims);show(btnDia);show(btnDep);show(btnXray);
@@ -2704,6 +2744,7 @@ function brDrawThumb(txt,W,H){
 }
 
 async function brOpenFile(f){
+  if(appMode!=='viewer')setAppMode('viewer'); // klik w plik zawsze wraca do viewera
   brActiveName=f.name;
   document.querySelectorAll('.fb-item').forEach(el=>el.classList.toggle('fbact',el.dataset.name===f.name));
   try{
@@ -2758,9 +2799,13 @@ async function brInitFromIDB(){
     const xm=await IDB.get('xrayMode').catch(()=>null);
     if(xm){xrayMode=true;document.getElementById('btn-xray').classList.add('on');}
 
-    // Restore last view
+    // Restore last view (legacy 'gen' → tryb generatora)
     const lv=await IDB.get('lastView').catch(()=>null);
-    if(lv){switchView(lv);}
+    if(lv&&lv!=='gen'){switchView(lv);}
+
+    // Restore app mode (viewer / generator szafek)
+    const am=await IDB.get('appMode').catch(()=>null);
+    if(am==='gen'||lv==='gen')setAppMode('gen');
 
     // Restore directory
     const h=await IDB.get('brDirHandle');
@@ -2990,6 +3035,7 @@ async function saveSettings(){
   const gi=document.getElementById('set-bgap');
   if(gi)toolSettings.scannerGap=Math.max(20,Math.min(300,parseInt(gi.value)||80));
   await IDB.set('toolSettings',toolSettings);
+  genExportCfg(false); // auto-zapis całości do katalogu ustawień
   closeSettings();
   buildScene();
   if(curView!=='3d')draw2D();
@@ -3038,24 +3084,138 @@ function drawCode39(cv,txt){
   c.fillText(t,cv.width/2,cv.height-3);
 }
 
-let genRows=[];       // [{id,name,dl,dh,ds,tpl,fileName}] tpl=FileSystemFileHandle|null
+let genRows=[];       // formatki: [{id,name,qty,dl,dh,ds,kolor,sloje,opis,edgeF,edgeB,edgeL,edgeR,cabCode,tpl,fileName}]
 let genRowId=1;
-let genOutDir=null;   // FileSystemDirectoryHandle (readwrite)
-let genCabinets=[];   // definicje szafek: [{id,name,els:[{name,qty,dl,dh,ds,tpl}]}] wzory jako tekst
+let genCfgDir=null;   // katalog ustawień (eksport/import przez git)
+let genCabinets=[];   // definicje szafek: [{id,name,code,els:[{name,qty,dl,dh,ds,kolor,sloje,opis,edgeF,edgeB,edgeL,edgeR,tpl,tplName}]}] wzory jako tekst
 let genCabSel=0;      // indeks wybranej szafki
 let genOpts={base:16};// system liczbowy kodów plików (16 lub 10)
 const GEN_CODE_MAX=10;// maks. długość kodu (cyfr)
+const GEN_CFG_FILE='ustawienia.json';
+const GEN_CFG_FILE_OLD='szafki.json'; // odczyt starszego eksportu
+const GEN_CFG_TPLDIR='szablony';
+const GEN_FIXED_VARS=['H','W','D','T']; // podstawa – nieusuwalne
+const GEN_BASE_DEFS=[
+  {key:'H',label:'Wysokość (mm)',def:720},
+  {key:'W',label:'Szerokość (mm)',def:600},
+  {key:'D',label:'Głębokość (mm)',def:510},
+  {key:'T',label:'Grubość płyty (mm)',def:18},
+];
 
-function genDefaultCabinet(){
-  return {id:Date.now(),name:'Szafka standardowa',els:[
-    {name:'Bok lewy',     qty:'1',dl:'H',    dh:'D',ds:'T',tpl:null},
-    {name:'Bok prawy',    qty:'1',dl:'H',    dh:'D',ds:'T',tpl:null},
-    {name:'Wieniec dolny',qty:'1',dl:'W-2*T',dh:'D',ds:'T',tpl:null},
-    {name:'Wieniec górny',qty:'1',dl:'W-2*T',dh:'D',ds:'T',tpl:null},
-    {name:'Półka',        qty:'N',dl:'W-2*T',dh:'D',ds:'T',tpl:null},
-  ]};
+const escA=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
+/* Uzupełnia brakujące pola elementu (definicje zapisane starszą wersją) */
+function genElNorm(el){
+  return Object.assign({name:'Element',qty:'1',dl:'W-2*T',dh:'D',ds:'T',
+    kolor:'',sloje:'tak',opis:'',edgeF:'',edgeB:'',edgeL:'',edgeR:'',
+    tpl:null,tplName:''},el);
 }
-function genCab(){return genCabinets[genCabSel]||null;}
+/* Uzupełnia brakujące pola szafki; migracja: stare szafki dostają parametr N (ilość półek) */
+function genCabNorm(c){
+  if(!c.code)c.code=c.code||'';
+  if(!Array.isArray(c.params))c.params=[{key:'N',label:'Ilość półek',def:1}];
+  if(!c.base||typeof c.base!=='object')c.base={};
+  GEN_BASE_DEFS.forEach(bd=>{if(!(+c.base[bd.key]>0))c.base[bd.key]=bd.def;});
+  c.els=(c.els||[]).map(genElNorm);
+  return c;
+}
+function genDefaultCabinet(){
+  const e=(name,qty,dl)=>genElNorm({name,qty,dl});
+  return genCabNorm({id:Date.now(),name:'Szafka standardowa',code:'',els:[
+    e('Bok lewy','1','H'),
+    e('Bok prawy','1','H'),
+    e('Wieniec dolny','1','W-2*T'),
+    e('Wieniec górny','1','W-2*T'),
+    e('Półka','N','W-2*T'),
+  ]});
+}
+function genCab(){const c=genCabinets[genCabSel];return c?genCabNorm(c):null;}
+
+/* ── Parametry (podstawowe H/W/D/T + własne) ────────────────────── */
+/* Pola wartości w "Wymiary i generowanie" – tylko wpisywanie, bez edycji listy */
+function genRenderParams(){
+  const grid=document.getElementById('gen-dims-grid');
+  if(!grid)return;
+  grid.innerHTML='';
+  const c=genCab();if(!c)return;
+  const add=(label,key,val,onch)=>{
+    const d=document.createElement('div');
+    d.className='dimf gen-param';
+    d.innerHTML=`<label>${escA(label)} <b style="color:var(--pri)">${escA(key)}</b></label>`+
+      `<input type="number" id="gen-par-${escA(key)}" value="${val}" step="any" onchange="${onch}">`;
+    grid.appendChild(d);
+  };
+  GEN_BASE_DEFS.forEach(bd=>add(bd.label,bd.key,+c.base[bd.key]||bd.def,`genBaseDef('${bd.key}',this.value)`));
+  c.params.forEach((p,i)=>add(p.label,p.key,+p.def||0,`genParamDef(${i},this.value)`));
+}
+/* Edytor parametrów w "Ustawieniach szafki" – podstawowe (nieusuwalne) + własne */
+function genRenderParamsDef(){
+  const tb=document.getElementById('gen-par-def-tbody');
+  if(!tb)return;
+  const c=genCab();if(!c)return;
+  const baseRows=GEN_BASE_DEFS.map(bd=>`<tr>
+    <td style="min-width:160px">${escA(bd.label)}</td>
+    <td style="text-align:center"><b style="color:var(--pri)">${bd.key}</b></td>
+    <td><input type="number" step="any" value="${+c.base[bd.key]||bd.def}" onchange="genBaseDef('${bd.key}',this.value)"></td>
+    <td class="td-del"><span class="otb" title="Parametr podstawowy – nieusuwalny">podst.</span></td>
+  </tr>`).join('');
+  const ownRows=(c.params||[]).map((p,i)=>`<tr>
+    <td><input type="text" style="min-width:160px" value="${escA(p.label)}" onchange="genParamLabel(${i},this.value)"></td>
+    <td style="text-align:center"><b style="color:var(--pri)">${escA(p.key)}</b></td>
+    <td><input type="number" step="any" value="${+p.def||0}" onchange="genParamDef(${i},this.value)"></td>
+    <td class="td-del"><button class="btn-del" onclick="genDelParam(${i})">✕</button></td>
+  </tr>`).join('');
+  tb.innerHTML=baseRows+ownRows;
+}
+function genBaseDef(key,v){
+  const c=genCab();if(!c)return;
+  const n=parseFloat(v);
+  if(!isNaN(n)&&n>0)c.base[key]=n;
+  genRenderParams();
+  genRenderParamsDef();
+  genPersist();
+}
+function genParamLabel(i,v){
+  const c=genCab();if(!c?.params[i])return;
+  c.params[i].label=v.trim()||c.params[i].label;
+  genRenderParams();
+  genPersist();
+}
+function genUsedVarKeys(){
+  const used=new Set(GEN_FIXED_VARS);
+  genCabinets.forEach(c=>(c.params||[]).forEach(p=>used.add(p.key)));
+  return used;
+}
+function genAddParam(){
+  const c=genCab();if(!c)return;
+  const label=prompt('Nazwa parametru (np. Ilość szuflad):');
+  if(label===null||!label.trim())return;
+  // automatyczna litera zmiennej – pierwsza wolna, bez kolizji z H/W/D/T i innymi szafkami
+  const used=genUsedVarKeys();
+  const key=[...'NABCEFGIJKLMOPQRSUVXYZ'].find(k=>!used.has(k));
+  if(!key){showToast('Brak wolnych liter na zmienną',true);return;}
+  c.params.push({key,label:label.trim(),def:1});
+  genRenderParams();
+  genRenderParamsDef();
+  genPersist();
+  showToast('✓ Dodano parametr „'+label.trim()+'” – zmienna '+key+' do użycia we wzorach');
+}
+function genDelParam(i){
+  const c=genCab();if(!c?.params[i])return;
+  const p=c.params[i];
+  if(!confirm('Usunąć parametr „'+p.label+'” (zmienna '+p.key+')? Wzory używające '+p.key+' przestaną się liczyć.'))return;
+  c.params.splice(i,1);
+  genRenderParams();
+  genRenderParamsDef();
+  genPersist();
+}
+function genParamDef(i,v){
+  const c=genCab();if(!c?.params[i])return;
+  c.params[i].def=parseFloat(v)||0;
+  genRenderParams();
+  genRenderParamsDef();
+  genPersist();
+}
 
 /* Bezpieczna ewaluacja wzoru z definicji szafki (H,W,D,T,N + arytmetyka) */
 function genEval(expr,vars){
@@ -3073,23 +3233,36 @@ function genEval(expr,vars){
 }
 
 function genBuildList(){
-  const H=parseFloat(document.getElementById('gen-h').value)||0;
-  const W=parseFloat(document.getElementById('gen-w').value)||0;
-  const D=parseFloat(document.getElementById('gen-d').value)||0;
-  const N=Math.max(0,parseInt(document.getElementById('gen-shelves').value)||0);
-  const T=parseFloat(document.getElementById('gen-t').value)||18;
-  if(H<=0||W<=0||D<=0){showToast('Podaj poprawne wymiary szafki',true);return;}
   const cab=genCab();
-  if(!cab||!cab.els.length){showToast('Brak definicji szafki – dodaj elementy w opcjach',true);return;}
-  const vars={H,W,D,T,N};
+  if(!cab||!cab.els.length){showToast('Brak definicji szafki – dodaj elementy w trybie „Edytuj szafki”',true);return;}
+  const vars={};
+  GEN_BASE_DEFS.forEach(bd=>{
+    const v=parseFloat(document.getElementById('gen-par-'+bd.key)?.value);
+    vars[bd.key]=isNaN(v)?(+cab.base[bd.key]||bd.def):v;
+    cab.base[bd.key]=vars[bd.key]; // zapamiętaj ostatnio użytą wartość
+  });
+  if(vars.H<=0||vars.W<=0||vars.D<=0){showToast('Podaj poprawne wymiary szafki',true);return;}
+  if(!(vars.T>0))vars.T=18;
+  const T=vars.T;
+  cab.params.forEach(p=>{
+    const inp=document.getElementById('gen-par-'+p.key);
+    const v=parseFloat(inp?.value);
+    vars[p.key]=isNaN(v)?(+p.def||0):v;
+    p.def=vars[p.key]; // zapamiętaj ostatnio użytą wartość
+  });
+  genPersist();
   genRows=[];
   const bad=[];
-  cab.els.forEach(el=>{
+  cab.els.forEach(raw=>{
+    const el=genElNorm(raw);
     const q=Math.max(0,Math.round(genEval(el.qty,vars)??1));
     const dl=genEval(el.dl,vars),dh=genEval(el.dh,vars),ds=genEval(el.ds,vars)??T;
     if(dl===null||dh===null||dl<=0||dh<=0){if(q>0)bad.push(el.name);return;}
-    for(let i=1;i<=q;i++)
-      genRows.push({id:genRowId++,name:q>1?el.name+' '+i:el.name,dl,dh,ds,tpl:el.tpl||null,fileName:null});
+    if(q<1)return;
+    genRows.push({id:genRowId++,name:el.name,qty:q,dl,dh,ds,
+      kolor:el.kolor,sloje:el.sloje||'tak',opis:el.opis,
+      edgeF:el.edgeF,edgeB:el.edgeB,edgeL:el.edgeL,edgeR:el.edgeR,
+      cabCode:cab.code||'',tpl:el.tpl||null,tplName:el.tplName||el.tpl?.name||null,fileName:null});
   });
   if(bad.length)showToast('Błędny wzór lub wymiar ≤0: '+bad.join(', '),true);
   genRenderRows();
@@ -3097,12 +3270,20 @@ function genBuildList(){
 
 function genRenderRows(){
   const tb=document.getElementById('gen-tbody');
+  const txt=(r,f,w)=>`<td><input type="text" style="min-width:${w||70}px;width:${w||70}px" value="${escA(r[f])}" onchange="genUpd(${r.id},'${f}',this.value)"></td>`;
   tb.innerHTML=genRows.map(r=>`<tr>
-    <td><input type="text" value="${r.name}" onchange="genUpd(${r.id},'name',this.value)"></td>
+    ${txt(r,'kolor',90)}
+    <td><select onchange="genUpd(${r.id},'sloje',this.value)"><option value="tak"${r.sloje!=='nie'?' selected':''}>tak</option><option value="nie"${r.sloje==='nie'?' selected':''}>nie</option></select></td>
     <td><input type="number" step="0.1" value="${fvI(r.dl)}" onchange="genUpd(${r.id},'dl',this.value)"></td>
     <td><input type="number" step="0.1" value="${fvI(r.dh)}" onchange="genUpd(${r.id},'dh',this.value)"></td>
-    <td><input type="number" step="0.1" value="${fvI(r.ds)}" onchange="genUpd(${r.id},'ds',this.value)"></td>
-    <td style="font-size:var(--txs);color:${r.tpl?'var(--txt)':'var(--faint)'};max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.tpl?.name||''}">${r.tpl?.name||'pusty TCN'}</td>
+    <td><input type="number" step="1" min="1" style="width:52px" value="${r.qty||1}" onchange="genUpd(${r.id},'qty',this.value)"></td>
+    <td><input type="text" style="min-width:110px" value="${escA(r.name)}" onchange="genUpd(${r.id},'name',this.value)"></td>
+    ${txt(r,'cabCode',70)}
+    ${txt(r,'opis',110)}
+    ${txt(r,'edgeF',60)}
+    ${txt(r,'edgeB',60)}
+    ${txt(r,'edgeL',60)}
+    ${txt(r,'edgeR',60)}
     <td style="white-space:nowrap;color:${r.fileName?'var(--ok)':'var(--faint)'}">${r.fileName||'—'}</td>
     <td>${r.fileName?`<canvas id="gen-bc-${r.id}" width="200" height="50" style="background:#fff;border-radius:3px;display:block"></canvas>`:'<span style="color:var(--faint)">—</span>'}</td>
     <td class="td-del"><button class="btn-del" onclick="genDelRow(${r.id})">✕</button></td>
@@ -3114,29 +3295,35 @@ function genRenderRows(){
       if(cv)drawCode39(cv,r.fileName+'%');
     }
   });
-  document.getElementById('gen-list-box').style.display=genRows.length?'':'none';
+  document.getElementById('gen-list-box').style.display=(genRows.length&&genMode==='run')?'':'none';
   document.getElementById('gen-print-btn').disabled=!genRows.some(r=>r.fileName);
 }
 
 function genUpd(id,field,val){
   const r=genRows.find(r=>r.id===id);if(!r)return;
-  if(field==='name'){r.name=val;return;}
-  const v=parseFloat(val);if(isNaN(v))return;
-  r[field]=v;
-  // zmiana wymiarów unieważnia już wygenerowany plik
-  if(r.fileName){r.fileName=null;genRenderRows();}
+  if(field==='qty'){r.qty=Math.max(1,Math.round(parseFloat(val))||1);return;}
+  if(['dl','dh','ds'].includes(field)){
+    const v=parseFloat(val);if(isNaN(v))return;
+    r[field]=v;
+    // zmiana wymiarów unieważnia już wygenerowany plik
+    if(r.fileName){r.fileName=null;genRenderRows();}
+    return;
+  }
+  r[field]=val; // pola tekstowe: name, kolor, sloje, opis, cabCode, edge*
 }
 function genDelRow(id){genRows=genRows.filter(r=>r.id!==id);genRenderRows();}
 function genAddRow(){
-  const D=parseFloat(document.getElementById('gen-d').value)||500;
-  const T=parseFloat(document.getElementById('gen-t').value)||18;
-  genRows.push({id:genRowId++,name:'Element',tpl:null,dl:400,dh:D,ds:T,fileName:null});
+  const D=parseFloat(document.getElementById('gen-par-D')?.value)||500;
+  const T=parseFloat(document.getElementById('gen-par-T')?.value)||18;
+  genRows.push({id:genRowId++,name:'Element',qty:1,dl:400,dh:D,ds:T,
+    kolor:'',sloje:'tak',opis:'',edgeF:'',edgeB:'',edgeL:'',edgeR:'',
+    cabCode:genCab()?.code||'',tpl:null,fileName:null});
   genRenderRows();
 }
 
 /* ── Ustawienia szafek: definicje, wzory, szablony ──────────────── */
 let genPersistTimer=null;
-/* Autozapis definicji do IDB (debounce) */
+/* Autozapis definicji do IDB (debounce) + auto-eksport do katalogu ustawień */
 function genPersist(){
   clearTimeout(genPersistTimer);
   genPersistTimer=setTimeout(async()=>{
@@ -3144,24 +3331,240 @@ function genPersist(){
       await IDB.set('genCabinets',genCabinets); // uchwyty plików zapisują się razem z definicją
       await IDB.set('genOpts',genOpts);
     }catch(e){console.warn('genPersist:',e);showToast('Błąd zapisu ustawień szafek',true);}
+    genExportCfg(false); // cichy autozapis do katalogu ustawień (jeśli podpięty)
   },400);
+}
+
+/* ── Katalog ustawień: eksport/import przez git ─────────────────── */
+async function genCfgPerm(mode,queryOnly){
+  if(!genCfgDir)return false;
+  try{
+    let p=await genCfgDir.queryPermission({mode});
+    if(p!=='granted'&&!queryOnly)p=await genCfgDir.requestPermission({mode});
+    return p==='granted';
+  }catch(e){return false;}
+}
+function genCfgStatus(txt){
+  const s=document.getElementById('gen-cfgdir-status');
+  if(s)s.textContent=txt;
+}
+async function genPickCfgDir(){
+  if(!('showDirectoryPicker' in window)){showToast('Przeglądarka nie obsługuje wyboru katalogu',true);return;}
+  try{
+    const h=await window.showDirectoryPicker({mode:'readwrite'});
+    genCfgDir=h;
+    await IDB.set('genCfgDir',h);
+    genCfgStatus(h.name);
+    // Jeśli katalog już zawiera ustawienia (np. świeżo z gita) – zaproponuj import zamiast nadpisania
+    let hasCfg=false;
+    try{await h.getFileHandle(GEN_CFG_FILE);hasCfg=true;}
+    catch(e){try{await h.getFileHandle(GEN_CFG_FILE_OLD);hasCfg=true;}catch(_){}}
+    if(hasCfg&&confirm('Katalog zawiera już zapisane ustawienia.\nWczytać ustawienia z katalogu? (Anuluj = nadpisz katalog bieżącymi ustawieniami)')){
+      await genImportCfg();
+    }else{
+      await genExportCfg(true);
+    }
+  }catch(e){if(e.name!=='AbortError')console.error(e);}
+}
+/* Zbiera CAŁOŚĆ ustawień do JSON (uchwyty plików → nazwy w szablony/) */
+function genCfgSerialize(){
+  return JSON.stringify({
+    version:2,
+    exported:new Date().toISOString(),
+    opts:genOpts,
+    toolSettings:{
+      millTools:toolSettings.millTools,
+      sawTools:toolSettings.sawTools,
+      scannerGap:toolSettings.scannerGap||80,
+    },
+    cabinets:genCabinets.map(genCabNorm).map(c=>({
+      id:c.id,name:c.name,code:c.code||'',
+      base:c.base,
+      params:(c.params||[]).map(p=>({key:p.key,label:p.label,def:p.def})),
+      els:c.els.map(el=>({
+        name:el.name,qty:el.qty,dl:el.dl,dh:el.dh,ds:el.ds,
+        kolor:el.kolor,sloje:el.sloje,opis:el.opis,
+        edgeF:el.edgeF,edgeB:el.edgeB,edgeL:el.edgeL,edgeR:el.edgeR,
+        tplName:el.tplName||el.tpl?.name||null,
+      })),
+    })),
+  },null,2);
+}
+/* Zapis szafki.json + kopie szablonów TCN do szablony/. verbose=true → toasty */
+async function genExportCfg(verbose){
+  if(!genCfgDir){if(verbose)showToast('Najpierw wybierz katalog ustawień',true);return;}
+  if(!await genCfgPerm('readwrite')){
+    genCfgStatus(genCfgDir.name+' (brak zezwolenia)');
+    if(verbose)showToast('Brak uprawnień zapisu do katalogu ustawień',true);
+    return;
+  }
+  try{
+    const fh=await genCfgDir.getFileHandle(GEN_CFG_FILE,{create:true});
+    const w=await fh.createWritable();
+    await w.write(genCfgSerialize());await w.close();
+    // Kopie szablonów – dzięki temu git przenosi też pliki TCN
+    const tplDir=await genCfgDir.getDirectoryHandle(GEN_CFG_TPLDIR,{create:true});
+    const done=new Set();
+    for(const c of genCabinets)for(const raw of (c.els||[])){
+      const el=genElNorm(raw);
+      if(!el.tpl||done.has(el.tplName||el.tpl.name))continue;
+      try{
+        const name=el.tplName||el.tpl.name;
+        const txt=await (await el.tpl.getFile()).text();
+        const tfh=await tplDir.getFileHandle(name,{create:true});
+        const tw=await tfh.createWritable();
+        await tw.write(txt);await tw.close();
+        done.add(name);
+      }catch(e){console.warn('kopia szablonu:',e);}
+    }
+    genCfgStatus(genCfgDir.name+' ✓');
+    if(verbose)showToast('✓ Wyeksportowano ustawienia do „'+genCfgDir.name+'”');
+  }catch(e){
+    console.warn('genExportCfg:',e);
+    if(verbose)showToast('Błąd eksportu: '+e.message,true);
+  }
+}
+/* Nakłada wczytany JSON na stan aplikacji; resolveTpl(name) → uchwyt pliku szablonu lub null */
+async function genApplyCfg(cfg,resolveTpl){
+  if(!Array.isArray(cfg.cabinets)||!cfg.cabinets.length)throw new Error('brak szafek w pliku');
+  const missing=new Set();
+  const cabs=[];
+  for(const c of cfg.cabinets){
+    const els=[];
+    for(const e of (c.els||[])){
+      const el=genElNorm(e);
+      el.tpl=null;
+      if(el.tplName){
+        const h=await resolveTpl(el.tplName);
+        if(h)el.tpl=h;else missing.add(el.tplName);
+      }
+      els.push(el);
+    }
+    cabs.push(genCabNorm({id:c.id||Date.now()+cabs.length,name:c.name||'Szafka',code:c.code||'',base:c.base,params:c.params,els}));
+  }
+  genCabinets=cabs;
+  if(cfg.opts&&(cfg.opts.base===10||cfg.opts.base===16))genOpts=cfg.opts;
+  // Ustawienia narzędzi (frezy, piłki, skaner) – całość ustawień
+  if(cfg.toolSettings&&Array.isArray(cfg.toolSettings.millTools)){
+    toolSettings={
+      millTools:cfg.toolSettings.millTools,
+      sawTools:cfg.toolSettings.sawTools||[],
+      scannerGap:cfg.toolSettings.scannerGap||80,
+    };
+  }
+  genCabSel=0;
+  genRenderCabSel();
+  try{
+    await IDB.set('genCabinets',genCabinets);
+    await IDB.set('genOpts',genOpts);
+    await IDB.set('toolSettings',toolSettings);
+  }catch(e){console.warn(e);}
+  return {count:cabs.length,missing};
+}
+
+/* Wczytuje ustawienia.json (lub starsze szafki.json) ze wskazanego katalogu.
+   silent=true → start aplikacji: bez toastów o sukcesie, bez promptu o uprawnienia */
+async function genImportCfg(silent){
+  if(!genCfgDir){if(!silent)showToast('Najpierw wybierz katalog ustawień',true);return false;}
+  if(!await genCfgPerm('read',silent)){
+    if(!silent)showToast('Brak uprawnień odczytu katalogu ustawień',true);
+    else genCfgStatus(genCfgDir.name+' (kliknij Wczytaj)');
+    return false;
+  }
+  try{
+    let fh=null;
+    try{fh=await genCfgDir.getFileHandle(GEN_CFG_FILE);}
+    catch(_){fh=await genCfgDir.getFileHandle(GEN_CFG_FILE_OLD);}
+    const cfg=JSON.parse(await (await fh.getFile()).text());
+    let tplDir=null;
+    try{tplDir=await genCfgDir.getDirectoryHandle(GEN_CFG_TPLDIR);}catch(e){}
+    const res=await genApplyCfg(cfg,async name=>{
+      if(!tplDir)return null;
+      try{return await tplDir.getFileHandle(name);}catch(_){return null;}
+    });
+    genCfgViaFetch=false;
+    genCfgStatus(genCfgDir.name+' ✓');
+    if(!silent){
+      showToast('✓ Wczytano ustawienia ('+res.count+' szafek) z „'+genCfgDir.name+'”');
+      if(res.missing.size)showToast('Brak szablonów w '+GEN_CFG_TPLDIR+'/: '+[...res.missing].join(', '),true);
+    }
+    return true;
+  }catch(e){
+    console.warn('genImportCfg:',e);
+    if(!silent)showToast('Błąd importu: '+e.message,true);
+    return false;
+  }
+}
+
+/* ── Katalog podstawowy = katalog pliku HTML ──────────────────────
+   Bez wskazanego katalogu ustawienia.json leżący obok pliku HTML jest
+   wczytywany automatycznie (fetch względny). Szablony czytane są wtedy
+   z szablony/<nazwa> dopiero przy generowaniu plików. Zapis automatyczny
+   wymaga jednak wskazania katalogu (ograniczenie przeglądarki). */
+let genCfgViaFetch=false;
+async function genImportCfgFetch(){
+  if(location.protocol==='file:')return false; // fetch względny nie działa z file://
+  try{
+    let r=await fetch(GEN_CFG_FILE,{cache:'no-store'});
+    if(!r.ok)r=await fetch(GEN_CFG_FILE_OLD,{cache:'no-store'});
+    if(!r.ok)return false;
+    const cfg=JSON.parse(await r.text());
+    await genApplyCfg(cfg,async()=>null); // szablony przez fetch przy zapisie
+    genCfgViaFetch=true;
+    genCfgStatus('katalog aplikacji (auto-odczyt)');
+    return true;
+  }catch(e){return false;}
+}
+/* Szablon z katalogu aplikacji (szablony/<nazwa>) – gdy ustawienia przyszły przez fetch */
+async function genFetchTplText(name,cache){
+  const key='fetch:'+name;
+  if(cache.has(key))return cache.get(key);
+  let txt=null;
+  try{
+    const r=await fetch(GEN_CFG_TPLDIR+'/'+encodeURIComponent(name),{cache:'no-store'});
+    if(r.ok)txt=await r.text();
+  }catch(e){}
+  cache.set(key,txt);
+  return txt;
 }
 function genToggleOpts(){
   const p=document.getElementById('gen-opts-box');
   const vis=p.style.display!=='none';
   p.style.display=vis?'none':'';
-  document.getElementById('gen-opts-toggle').textContent=vis?'⚙ Ustawienia':'⚙ Ukryj ustawienia';
+  document.getElementById('gen-opts-toggle').textContent=vis?'✎ Edytuj szafkę':'✎ Ukryj edycję';
+}
+
+/* ── Tryb generatora: Generuj szafki / Edytuj szafki ────────────── */
+let genMode='run'; // 'run' = generowanie, 'edit' = edycja definicji
+function genSetMode(m){
+  genMode=(m==='edit')?'edit':'run';
+  document.getElementById('gen-mode-run').classList.toggle('act',genMode==='run');
+  document.getElementById('gen-mode-edit').classList.toggle('act',genMode==='edit');
+  // Generuj: wybór szafki + wymiary + formatki. Edytuj: przyciski szafek + definicja.
+  document.getElementById('gen-edit-btns').style.display=genMode==='edit'?'inline-flex':'none';
+  document.getElementById('gen-dims-box').style.display=genMode==='run'?'':'none';
+  document.getElementById('gen-list-box').style.display=(genMode==='run'&&genRows.length)?'':'none';
+  if(genMode==='run'){
+    // schowaj panel edycji i zresetuj przycisk
+    document.getElementById('gen-opts-box').style.display='none';
+    document.getElementById('gen-opts-toggle').textContent='✎ Edytuj szafkę';
+  }
+  IDB.set('genMode',genMode).catch(()=>{});
 }
 function genRenderCabSel(){
   const sel=document.getElementById('gen-cab-run');
   sel.innerHTML=genCabinets.map((c,i)=>`<option value="${i}"${i===genCabSel?' selected':''}>${c.name}</option>`).join('');
   const nameInp=document.getElementById('gen-cab-name');
   if(nameInp)nameInp.value=genCab()?.name||'';
+  const codeInp=document.getElementById('gen-cab-code');
+  if(codeInp)codeInp.value=genCab()?.code||'';
   const title=document.getElementById('gen-opts-title');
   if(title)title.textContent='⚙ Ustawienia szafki: '+(genCab()?.name||'');
   const baseSel=document.getElementById('gen-base');
   if(baseSel)baseSel.value=String(genOpts.base===10?10:16);
   genRenderDefs();
+  genRenderParams();
+  genRenderParamsDef();
 }
 function genSelCab(i){genCabSel=Math.max(0,Math.min(genCabinets.length-1,i));genRenderCabSel();}
 function genAddCab(){
@@ -3197,28 +3600,47 @@ function genBaseChanged(){
   genOpts.base=(+baseSel.value===10)?10:16;
   genPersist();
 }
+function genCabCodeChanged(v){
+  const c=genCab();if(!c)return;
+  c.code=v.trim();
+  genPersist();
+}
 function genRenderDefs(){
   const tb=document.getElementById('gen-def-tbody');
   if(!tb)return;
   const c=genCab();
-  tb.innerHTML=(c?.els||[]).map((el,i)=>`<tr>
-    <td><input type="text" value="${el.name}" onchange="genDefUpd(${i},'name',this.value)"></td>
-    <td><input type="text" style="min-width:50px;width:60px;text-align:center" value="${el.qty}" onchange="genDefUpd(${i},'qty',this.value)"></td>
-    <td><input type="text" style="min-width:80px;width:95px;text-align:center" value="${el.dl}" onchange="genDefUpd(${i},'dl',this.value)"></td>
-    <td><input type="text" style="min-width:80px;width:95px;text-align:center" value="${el.dh}" onchange="genDefUpd(${i},'dh',this.value)"></td>
-    <td><input type="text" style="min-width:50px;width:60px;text-align:center" value="${el.ds}" onchange="genDefUpd(${i},'ds',this.value)"></td>
+  const txt=(el,i,f,w)=>`<td><input type="text" style="min-width:${w}px;width:${w}px;text-align:center" value="${escA(el[f])}" onchange="genDefUpd(${i},'${f}',this.value)"></td>`;
+  tb.innerHTML=(c?.els||[]).map(genElNorm).map((el,i)=>`<tr>
+    <td><input type="text" style="min-width:90px;width:90px" value="${escA(el.kolor)}" onchange="genDefUpd(${i},'kolor',this.value)"></td>
+    <td><select onchange="genDefUpd(${i},'sloje',this.value)"><option value="tak"${el.sloje!=='nie'?' selected':''}>tak</option><option value="nie"${el.sloje==='nie'?' selected':''}>nie</option></select></td>
+    ${txt(el,i,'dl',90)}
+    ${txt(el,i,'dh',90)}
+    ${txt(el,i,'qty',50)}
+    <td><input type="text" style="min-width:110px" value="${escA(el.name)}" onchange="genDefUpd(${i},'name',this.value)"></td>
+    <td><input type="text" style="min-width:110px" value="${escA(el.opis)}" onchange="genDefUpd(${i},'opis',this.value)"></td>
+    ${txt(el,i,'edgeF',55)}
+    ${txt(el,i,'edgeB',55)}
+    ${txt(el,i,'edgeL',55)}
+    ${txt(el,i,'edgeR',55)}
+    ${txt(el,i,'ds',55)}
     <td style="white-space:nowrap">
       <button class="btn btn-sec" style="font-size:var(--txs);padding:3px 8px" onclick="genDefPickTpl(${i})" title="Wybierz plik szablonu TCN">📄</button>
-      <span style="font-size:var(--txs);color:${el.tpl?'var(--ok)':'var(--faint)'}" title="${el.tpl?.name||''}">${el.tpl?.name||'pusty TCN'}</span>
+      <span style="font-size:var(--txs);color:${el.tpl||el.tplName?'var(--ok)':'var(--faint)'}" title="${escA(el.tpl?.name||el.tplName||'')}">${escA(el.tpl?.name||el.tplName||'pusty TCN')}</span>
     </td>
     <td class="td-del"><button class="btn-del" onclick="genDefDelEl(${i})">✕</button></td>
   </tr>`).join('');
 }
-function genDefUpd(i,f,v){const c=genCab();if(c?.els[i]){c.els[i][f]=f==='name'?v:v.trim();genPersist();}}
+const GEN_DEF_TXT=['name','kolor','opis','sloje']; // pola bez trim wzorów
+function genDefUpd(i,f,v){
+  const c=genCab();if(!c?.els[i])return;
+  c.els[i]=genElNorm(c.els[i]);
+  c.els[i][f]=GEN_DEF_TXT.includes(f)?v:v.trim();
+  genPersist();
+}
 function genDefDelEl(i){const c=genCab();if(!c)return;c.els.splice(i,1);genRenderDefs();genPersist();}
 function genDefAddEl(){
   const c=genCab();if(!c)return;
-  c.els.push({name:'Element',qty:'1',dl:'W-2*T',dh:'D',ds:'T',tpl:null});
+  c.els.push(genElNorm({}));
   genRenderDefs();
   genPersist();
 }
@@ -3227,19 +3649,11 @@ async function genDefPickTpl(i){
   if(!('showOpenFilePicker' in window)){showToast('Przeglądarka nie obsługuje wyboru pliku',true);return;}
   try{
     const [h]=await window.showOpenFilePicker({types:[{description:'TCN files',accept:{'text/plain':['.TCN','.tcn']}}]});
+    c.els[i]=genElNorm(c.els[i]);
     c.els[i].tpl=h;
+    c.els[i].tplName=h.name;
     genRenderDefs();
     genPersist();
-  }catch(e){if(e.name!=='AbortError')console.error(e);}
-}
-
-async function genPickOutDir(){
-  if(!('showDirectoryPicker' in window)){showToast('Przeglądarka nie obsługuje wyboru katalogu',true);return;}
-  try{
-    const h=await window.showDirectoryPicker({mode:'readwrite'});
-    genOutDir=h;
-    await IDB.set('genOutDir',h);
-    document.getElementById('gen-outdir-status').textContent=h.name;
   }catch(e){if(e.name!=='AbortError')console.error(e);}
 }
 
@@ -3279,10 +3693,13 @@ async function genWriteFiles(){
   if(!genRows.length){showToast('Najpierw wygeneruj listę elementów',true);return;}
   const todo=genRows.filter(r=>!r.fileName);
   if(!todo.length){showToast('Wszystkie elementy mają już pliki',true);return;}
-  if(!genOutDir){await genPickOutDir();if(!genOutDir)return;}
+  // Pliki lądują w katalogu z paska plików po lewej
+  if(!brDirHandle){showToast('Najpierw wybierz katalog na pasku plików po lewej (📁 Katalog)',true);return;}
+  const outDir=brDirHandle;
   try{
-    if((await genOutDir.queryPermission({mode:'readwrite'}))!=='granted'){
-      if((await genOutDir.requestPermission({mode:'readwrite'}))!=='granted'){
+    // pasek otwiera katalog w trybie odczytu – do zapisu podnosimy uprawnienia
+    if((await outDir.queryPermission({mode:'readwrite'}))!=='granted'){
+      if((await outDir.requestPermission({mode:'readwrite'}))!=='granted'){
         showToast('Brak uprawnień zapisu do katalogu',true);return;
       }
     }
@@ -3294,7 +3711,7 @@ async function genWriteFiles(){
   const reCode=base===16?/^([0-9A-F]{1,10})\.tcn$/i:/^(\d{1,10})\.tcn$/i;
   let maxN=0;
   try{
-    for await(const [name,fh] of genOutDir.entries()){
+    for await(const [name,fh] of outDir.entries()){
       const m=name.match(reCode);
       if(fh.kind==='file'&&m)maxN=Math.max(maxN,parseInt(m[1],base));
     }
@@ -3304,11 +3721,13 @@ async function genWriteFiles(){
     n++;
     const code=n.toString(base).toUpperCase();
     if(code.length>GEN_CODE_MAX){showToast('Przekroczono maks. '+GEN_CODE_MAX+' cyfr kodu',true);break;}
-    const tplTxt=await genGetTplText(r.tpl,tplCache);
-    if(r.tpl&&tplTxt===null)tplFail.add(r.tpl.name||'?');
+    let tplTxt=await genGetTplText(r.tpl,tplCache);
+    // Ustawienia z katalogu aplikacji (fetch): szablon czytamy z szablony/<nazwa>
+    if(tplTxt===null&&!r.tpl&&r.tplName&&genCfgViaFetch)tplTxt=await genFetchTplText(r.tplName,tplCache);
+    if((r.tpl||r.tplName)&&tplTxt===null)tplFail.add(r.tpl?.name||r.tplName||'?');
     const txt=genMakeTCN(tplTxt,r);
     try{
-      const fh=await genOutDir.getFileHandle(code+'.TCN',{create:true});
+      const fh=await outDir.getFileHandle(code+'.TCN',{create:true});
       const w=await fh.createWritable();
       await w.write(txt);await w.close();
       r.fileName=code+'.TCN'; // plik bez '%'; '%' tylko w kodzie kreskowym
@@ -3317,9 +3736,8 @@ async function genWriteFiles(){
   }
   genRenderRows();
   if(tplFail.size)showToast('Nie odczytano szablonów (użyto pustych): '+[...tplFail].join(', '),true);
-  if(written)showToast(`✓ Zapisano ${written} plików w „${genOutDir.name}”`);
-  // Odśwież przeglądarkę plików jeśli patrzy na ten sam katalog
-  try{if(brDirHandle&&genOutDir.isSameEntry&&await genOutDir.isSameEntry(brDirHandle))brLoadDir();}catch(e){}
+  if(written)showToast(`✓ Zapisano ${written} plików w „${outDir.name}”`);
+  brLoadDir(); // nowe pliki od razu widoczne na pasku
 }
 
 function genPrint(){
@@ -3330,21 +3748,23 @@ function genPrint(){
   const items=rows.map(r=>{
     const cv=document.getElementById('gen-bc-'+r.id);
     const url=cv?cv.toDataURL():'';
-    return `<div class="lbl"><img src="${url}"><div>${r.name} · ${fvI(r.dl)}×${fvI(r.dh)}×${fvI(r.ds)}</div></div>`;
+    const extra=[r.cabCode,r.kolor].filter(Boolean).join(' · ');
+    const one=`<div class="lbl"><img src="${url}"><div>${escA(r.name)} · ${fvI(r.dl)}×${fvI(r.dh)}×${fvI(r.ds)}${extra?' · '+escA(extra):''}</div></div>`;
+    return one.repeat(Math.max(1,r.qty||1)); // po jednej etykiecie na sztukę
   }).join('');
   w.document.write(`<!DOCTYPE html><html><head><title>Etykiety</title><style>
     body{font-family:sans-serif;margin:10mm}
     .lbl{display:inline-block;border:1px dashed #999;padding:6px 10px;margin:4px;text-align:center;font-size:11px}
     .lbl img{display:block;margin:0 auto 4px}
-  </style></head><body>${items}</body></html>`);
+  </style></head><body>${items}<\/body><\/html>`);
   w.document.close();
   setTimeout(()=>{try{w.print();}catch(e){}},400);
 }
 
 async function genInitFromIDB(){
   try{
-    const d=await IDB.get('genOutDir').catch(()=>null);
-    if(d){genOutDir=d;document.getElementById('gen-outdir-status').textContent=d.name;}
+    const cd=await IDB.get('genCfgDir').catch(()=>null);
+    if(cd){genCfgDir=cd;genCfgStatus(cd.name);}
     const o=await IDB.get('genOpts').catch(()=>null);
     if(o&&(o.base===10||o.base===16))genOpts=o;
     const cabs=await IDB.get('genCabinets').catch(()=>null);
@@ -3363,6 +3783,15 @@ async function genInitFromIDB(){
   if(!genCabinets.length)genCabinets=[genDefaultCabinet()];
   genCabSel=0;
   genRenderCabSel();
+  // Przywróć tryb Generuj/Edytuj
+  const gm=await IDB.get('genMode').catch(()=>null);
+  genSetMode(gm==='edit'?'edit':'run');
+  // Katalog ustawień jest źródłem prawdy – przy starcie wczytaj z niego (po cichu),
+  // np. świeże zmiany przyniesione gitem z innego komputera.
+  // Podstawowy katalog = katalog pliku HTML (fetch względny), wskazany ręcznie ma pierwszeństwo.
+  let loaded=false;
+  if(genCfgDir)loaded=await genImportCfg(true);
+  if(!loaded)await genImportCfgFetch();
 }
 
 (function(){
