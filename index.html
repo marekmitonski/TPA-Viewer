@@ -261,6 +261,10 @@ main{display:flex;overflow:hidden}
           Obróć 180°
         </button>
       </div>
+      <div class="box" id="rvar-box" style="display:none">
+        <h3>Zmienne (VAR)</h3>
+        <div id="rvar-list"></div>
+      </div>
       <div class="box" id="edge-box" style="display:none">
         <h3>Okleina krawędzi</h3>
         <div id="edge-info"></div>
@@ -311,11 +315,11 @@ main{display:flex;overflow:hidden}
             <option value="10">dziesiętny (10)</option>
           </select></div>
         </div>
-        <p class="gen-note">Wzory wymiarów: <b>H</b>=wysokość, <b>W</b>=szerokość, <b>D</b>=głębokość, <b>T</b>=grubość płyty + parametry własne poniżej (litera zmiennej przydzielana automatycznie). Dozwolone + − * / ( ), np. <b>W-2*T</b>. Ilość też może być wzorem. Szablon TCN jest podpięty na stałe – przy generowaniu podmieniane są w nim tylko wymiary (::UNm DL/DH/DS); brak szablonu = pusty plik TCN. Zmiany zapisują się automatycznie.</p>
+        <p class="gen-note">Wzory wymiarów: <b>H</b>=wysokość, <b>W</b>=szerokość, <b>D</b>=głębokość, <b>T</b>=grubość płyty + parametry własne poniżej (litera zmiennej przydzielana automatycznie). Dozwolone + − * / ( ), np. <b>W-2*T</b>. Ilość też może być wzorem. Parametr typu <b>lista</b> to lista rozwijana – wybrana opcja daje wartość liczbową równą pozycji na liście (0, 1, 2…). Przy generowaniu w szablonie TCN podmieniane są wymiary (::UNm DL/DH/DS) oraz zmienne <b>r</b> z sekcji VAR – przycisk <b>r</b> przy szablonie pozwala przypisać im wzory szafki (np. r1=<b>N</b>); brak szablonu = pusty plik TCN. Zmiany zapisują się automatycznie.</p>
         <div style="margin-bottom:var(--s4)">
           <div class="ogt" style="margin-bottom:var(--s2)">Parametry szafki (podstawowe H/W/D/T + własne)</div>
           <table class="gen-table" style="width:auto">
-            <thead><tr><th>Nazwa parametru</th><th>Zmienna</th><th>Wartość domyślna</th><th></th></tr></thead>
+            <thead><tr><th>Nazwa parametru</th><th>Zmienna</th><th>Typ</th><th>Wartość domyślna / opcje listy</th><th></th></tr></thead>
             <tbody id="gen-par-def-tbody"></tbody>
           </table>
           <button class="btn btn-sec" onclick="genAddParam()" style="margin-top:var(--s2);font-size:var(--txs);padding:4px 10px">＋ Dodaj parametr</button>
@@ -420,6 +424,15 @@ let fileDecSep='.';
 let fileLineEnding='\r\n';
 // Whether the original file writes integers as X.0 (e.g. 35.0 instead of 35)
 let fileDecInt1=false;
+// Encoding of the loaded file ('utf-8' | 'utf-16le' | 'utf-16be') – preserved on save
+let fileEncoding='utf-8';
+// "r" variables from the VAR{} section: [{idx,value,name,desc}]
+let RVARS=[];
+// Resolved numeric values of r variables: {r0:18, r1:2, ...}
+let RVAL={};
+// File contains TPA logical instructions (IF/ENDIF/ELSE…) → template mode:
+// save keeps the file verbatim, only dims (::UNm) and VAR values are edited
+let _isTemplate=false;
 // System locale decimal separator – used for UI display
 const SYS_DEC=(1.1).toLocaleString().replace(/\d/g,'').trim()||'.';
 let selWs=null,curFilter='ALL',curView='3d',showDims=true,xrayMode=false;
@@ -492,22 +505,31 @@ function setLoadedState(ok,name=''){
 }
 
 /* ─── PARSER ─────────────────────────────────────────────────────── */
-/* Evaluate a TPA coordinate value: a plain number, a dimension variable
-   (l/x→DL długość, h/z→DH wysokość, s/y→DS grubość) or a simple arithmetic
-   expression mixing them (np. "y/2", "18-9", "l/2-10"). Returns a number,
+/* Evaluate a TPA coordinate value: a plain number, a dimension variable,
+   an "r" variable (r0, r1… from the VAR{} section) or a simple arithmetic
+   expression mixing them (np. "y/2", "18-9", "x-r0-0.5"). Returns a number,
    or null when it cannot be resolved. Used only for VISUALISATION — the raw
-   file text is stored verbatim, so saving is unaffected. */
-function evalTcnExpr(valStr,dims){
+   file text is stored verbatim, so saving is unaffected.
+   Piece dims: l→DL, h→DH, s→DS (always). Face-local dims x/y/z (=lf/hf/sf)
+   depend on the face (TpaCAD manual): TOP/BOTTOM lf=l,hf=h,sf=s ·
+   FRONT/BACK lf=l,hf=s,sf=h · RIGHT/LEFT lf=h,hf=s,sf=l.
+   dims may carry an R map ({r0:…}) to override global RVAL (thumbnails). */
+function evalTcnExpr(valStr,dims,side){
   if(valStr==null)return null;
   let s=String(valStr).trim().replace(/,/g,'.');
   if(s==='')return null;
   // fast path: plain (signed/decimal) number
   if(/^-?\d*\.?\d+$/.test(s))return parseFloat(s);
   const D=dims||EL;
-  // X = długość (DL), Y = grubość (DS), Z = wysokość (DH)
-  const vars={l:D.DL,h:D.DH,s:D.DS,x:D.DL,y:D.DS,z:D.DH};
-  const expr=s.replace(/[a-z]+/gi,(m)=>{
+  const FD={TOP:[D.DL,D.DH,D.DS],BOTTOM:[D.DL,D.DH,D.DS],
+            FRONT:[D.DL,D.DS,D.DH],BACK:[D.DL,D.DS,D.DH],
+            RIGHT:[D.DH,D.DS,D.DL],LEFT:[D.DH,D.DS,D.DL]};
+  const f=FD[side]||FD.TOP;
+  const vars={l:D.DL,h:D.DH,s:D.DS,x:f[0],y:f[1],z:f[2],lf:f[0],hf:f[1],sf:f[2]};
+  const rv=(dims&&dims.R)||RVAL;
+  const expr=s.replace(/[a-z]+\d*/gi,(m)=>{
     const k=m.toLowerCase();
+    if(/^r\d+$/.test(k))return (rv[k]!=null&&!isNaN(rv[k]))?'('+rv[k]+')':'@';
     return (k in vars && vars[k]!=null && !isNaN(vars[k]))?'('+vars[k]+')':'@';
   });
   if(/@/.test(expr))return null;                 // unresolved variable name
@@ -516,6 +538,66 @@ function evalTcnExpr(valStr,dims){
     const v=Function('"use strict";return('+expr+')')();
     return (typeof v==='number'&&isFinite(v))?v:null;
   }catch(_){return null;}
+}
+
+/* ─── TPA LOGICAL INSTRUCTIONS (IF/ELSE/ENDIF) ────────────────────
+   W#2001=IF, W#2002=ENDIF, W#2005=ELSE (TpaCAD working database).
+   IF condition: up to 3 terms (e1 ? e2): e-fields #8070/#8073,
+   #8071/#8074, #8072/#8075; operators #8060/#8061/#8062
+   (0..5 = < <= > >= = <>); And/Or joins #8065/#8066 (0=And,1=Or). */
+const TPA_LOGIC_CODES=new Set(['2001','2002','2005','2006','2007','2008','2009']);
+function evalIfCond(raw,side,dims){
+  const gx=(k)=>{const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));return m?m[1]:null;};
+  const EPS=0.001;
+  const term=(a,op,b)=>{
+    const e1=evalTcnExpr(gx(a)??'0',dims,side);
+    const e2=evalTcnExpr(gx(b)??'0',dims,side);
+    if(e1===null||e2===null)return true; // unresolved → show rather than hide
+    switch(+(gx(op)||0)){
+      case 0:return e1<e2-EPS;  case 1:return e1<=e2+EPS;
+      case 2:return e1>e2+EPS;  case 3:return e1>=e2-EPS;
+      case 4:return Math.abs(e1-e2)<=EPS; default:return Math.abs(e1-e2)>EPS;
+    }
+  };
+  const has=(a,b)=>gx(a)!=null||gx(b)!=null;
+  if(!has('8070','8073')&&!has('8071','8074')&&!has('8072','8075'))return true;
+  let res=has('8070','8073')?term('8070','8060','8073'):true;
+  if(has('8071','8074')){const t2=term('8071','8061','8074');res=(+(gx('8065')||0)===1)?(res||t2):(res&&t2);}
+  if(has('8072','8075')){const t3=term('8072','8062','8075');res=(+(gx('8066')||0)===1)?(res||t3):(res&&t3);}
+  return res;
+}
+
+/* Parse the VAR{} section text into RVARS/RVAL-shaped structures.
+   Line format: #idx=value|name|w|f|description */
+function parseVarSection(txt){
+  const vars=[],vals={};
+  const m=txt.match(/(^|\n)\s*VAR\{([\s\S]*?)\}VAR/);
+  if(m){
+    m[2].split(/\r?\n/).forEach(ln=>{
+      const vm=ln.trim().match(/^#(\d+)=([^|]*)(?:\|(.*))?$/);
+      if(!vm)return;
+      const parts=(vm[3]||'').split('|');
+      vars.push({idx:+vm[1],value:vm[2].trim(),name:(parts[0]||'').trim(),desc:(parts[3]||'').trim()});
+    });
+  }
+  return {vars,vals};
+}
+
+/* Remove W-blocks hidden by IF/ELSE/ENDIF from a face body text.
+   Logic instruction blocks themselves are removed too. Used by thumbnails. */
+function filterLogicBody(body,dims,side){
+  const re=/W#(\d+)\{([\s\S]*?)\}W/g;
+  const st=[];const show=()=>st.length?st[st.length-1].show:true;
+  let m,out=[];
+  while((m=re.exec(body))){
+    const code=m[1];
+    if(code==='2001'){const parent=show();const c=parent&&evalIfCond(m[2],side,dims);st.push({show:c,met:c,parent});continue;}
+    if(code==='2005'){const t=st[st.length-1];if(t)t.show=t.parent&&!t.met;continue;}
+    if(code==='2002'){st.pop();continue;}
+    if(TPA_LOGIC_CODES.has(code))continue;
+    if(show())out.push(m[0]);
+  }
+  return out.join('\n');
 }
 function parseTCN(txt){
   _rawTCN=txt; // keep verbatim original
@@ -539,6 +621,16 @@ function parseTCN(txt){
   document.getElementById('ed-dh').value=EL.DH;
   document.getElementById('ed-ds').value=EL.DS;
 
+  // ── "r" variables (VAR{} section) ────────────────────────────────
+  RVARS=parseVarSection(normTxt).vars;
+  RVAL={};
+  RVARS.forEach(v=>{
+    // value may itself be a formula (l, h, s, earlier r's)
+    const num=evalTcnExpr(v.value);
+    if(num!==null)RVAL['r'+v.idx]=num;
+  });
+  _isTemplate=false;
+
   EDGE={R:null,L:null,T:null,B:null};
   const specM=normTxt.match(/SPEC\{([\s\S]*?)\}SPEC/);
   if(specM){
@@ -557,10 +649,11 @@ function parseTCN(txt){
   const sideRe=/SIDE#(\d+)\{([\s\S]*?)\}SIDE/g;
   const ops=[];let maxWs=0;let autoWs=500;let sm;
 
+  let curSideCtx='TOP'; // face of the op being parsed – for x/y/z in formulas
   const g=(raw,k,def=null)=>{
     const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));
     if(!m)return def;
-    const v=evalTcnExpr(m[1]);
+    const v=evalTcnExpr(m[1],null,curSideCtx);
     return v===null?def:v;
   };
   // gv: like g but rejects non-numeric values (variable names like 'l', 'b')
@@ -596,6 +689,8 @@ function parseTCN(txt){
     while((ot=origTokRe.exec(origBody)))origToks.push({full:`W#${ot[1]}{${ot[2]}}W`});
 
     let i=0;
+    const condStack=[]; // IF/ELSE/ENDIF nesting: {show,met,parent}
+    const condShow=()=>condStack.length?condStack[condStack.length-1].show:true;
     while(i<toks.length){
       const {code,raw}=toks[i];
       const rawLine=origToks[i]?.full||`W#${code}{${raw}}W`; // original verbatim
@@ -604,6 +699,18 @@ function parseTCN(txt){
       // Per-op face: prefer WF= inside the block, fall back to the SIDE# block
       const wff=wf(raw);
       const opSide=(wff!=null&&faceMap[wff])?faceMap[wff]:side;
+      curSideCtx=opSide;
+
+      // ── logical instructions ──
+      if(TPA_LOGIC_CODES.has(code)){
+        _isTemplate=true;
+        if(code==='2001'){const parent=condShow();const c=parent&&evalIfCond(raw,opSide,null);condStack.push({show:c,met:c,parent});}
+        else if(code==='2005'){const t=condStack[condStack.length-1];if(t)t.show=t.parent&&!t.met;}
+        else if(code==='2002'){condStack.pop();}
+        i++;continue;
+      }
+      // op hidden by an unmet IF condition → not parsed (invisible)
+      if(condStack.length&&!condShow()){i++;continue;}
 
       if(code==='81'){
         const x=g(raw,'1',null), y=g(raw,'2',null), z=g(raw,'3',null), dia=g(raw,'1002',null);
@@ -656,7 +763,7 @@ function parseTCN(txt){
         const gv2=(k,def=null)=>{
           const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));
           if(!m)return def;
-          const v=evalTcnExpr(m[1]);
+          const v=evalTcnExpr(m[1],null,curSideCtx);
           return v===null?def:v;
         };
         let x1=gv2('8510',null)??gv2('8020',null);
@@ -704,6 +811,68 @@ function parseTCN(txt){
   // Schedule prompt after render
   if(newMillTools.size||newSawTools.size){
     setTimeout(()=>promptNewTools([...newMillTools],[...newSawTools]),400);
+  }
+
+  renderRVars();
+  applyTemplateUI();
+}
+
+/* ─── "r" VARIABLES PANEL / TEMPLATE MODE ────────────────────────── */
+function renderRVars(){
+  const box=document.getElementById('rvar-box');
+  const list=document.getElementById('rvar-list');
+  if(!box||!list)return;
+  if(!RVARS.length){box.style.display='none';list.innerHTML='';return;}
+  box.style.display='';
+  list.innerHTML=RVARS.map(v=>{
+    const val=RVAL['r'+v.idx];
+    const label=(v.name||('r'+v.idx))+(v.desc?` – ${v.desc}`:'');
+    return `<div class="dimf" style="margin-bottom:var(--s2)">
+      <label><span style="opacity:.55">r${v.idx}</span> ${label}</label>
+      <input type="number" step="any" value="${val!=null?val:''}" ${val==null?`placeholder="${v.value}" disabled title="Wzór: ${v.value}"`:''} onchange="setRVar(${v.idx},this.value)">
+    </div>`;
+  }).join('');
+}
+
+function setRVar(idx,val){
+  const num=parseFloat(String(val).replace(',','.'));
+  if(isNaN(num)){renderRVars();return;}
+  // Rewrite the value inside the VAR{} block of the raw text, then re-parse
+  // so every formula and IF condition recomputes.
+  const vm=_rawTCN.match(/(^|\n)(\s*VAR\{)([\s\S]*?)(\}VAR)/);
+  if(!vm)return;
+  const newBlock=vm[3].replace(new RegExp('(^|\\n)(\\s*#'+idx+'=)[^|\\r\\n]*'),
+    (_,nl,tag)=>nl+tag+fmtTCN(num));
+  _rawTCN=_rawTCN.replace(vm[0],vm[1]+vm[2]+newBlock+vm[4]);
+  reparseTemplate();
+  showToast(`✓ r${idx} = ${num}`);
+}
+
+function reparseTemplate(){
+  parseTCN(_rawTCN);
+  renderOps();renderEdgeInfo();buildScene(true);
+  if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
+}
+
+/* In template mode rotation and adding ops are disabled – the file is kept
+   verbatim on save, only dims and VAR values can be corrected. */
+function applyTemplateUI(){
+  if(!LOADED&&!_isTemplate)return;
+  ['rotBtn','rot180Btn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&_isTemplate)el.disabled=true;
+  });
+  const aw=document.getElementById('add-wrap');
+  if(aw&&_isTemplate)aw.classList.add('hidden');
+  const badge=document.getElementById('file-name-badge');
+  if(badge){
+    let tag=badge.querySelector('.tpl-tag');
+    if(_isTemplate&&!tag){
+      tag=document.createElement('span');tag.className='tpl-tag';
+      tag.textContent=' ⚙wzory';tag.title='Plik parametryczny (IF/wzory) – zapis zachowuje oryginalną strukturę; edytuj wymiary i zmienne';
+      tag.style.cssText='color:#f59e0b;font-size:10px;font-weight:600';
+      badge.appendChild(tag);
+    } else if(!_isTemplate&&tag){tag.remove();}
   }
 }
 
@@ -1447,6 +1616,8 @@ function changeLabelFont(delta){
 
 function newFile(){
   OPS=[];selWs=null;fileHandle=null;fileDecSep='.';fileLineEnding='\r\n';fileDecInt1=false;nextWs=1;
+  _rawTCN='';_rawHeader='';fileEncoding='utf-8';RVARS=[];RVAL={};_isTemplate=false;
+  renderRVars();applyTemplateUI();
   EDGE={R:null,L:null,T:null,B:null};
   EL.DL=600;EL.DH=400;EL.DS=18;
   document.getElementById('ed-dl').value=EL.DL;
@@ -1558,6 +1729,14 @@ function updateEL(){
   EL.DH=parseFloat(document.getElementById('ed-dh').value)||0;
   EL.DS=parseFloat(document.getElementById('ed-ds').value)||0;
   document.getElementById('dim-lbl').textContent=LOADED?`${EL.DL} × ${EL.DH} × ${EL.DS} mm`:'Brak pliku';
+  if(_isTemplate&&_rawTCN){
+    // Template: write new dims into ::UNm and re-parse so that every formula
+    // (x, y, r-vars) and IF condition recomputes against the new dimensions.
+    _rawTCN=_rawTCN.replace(/(::UNm\s+DL=)[^\s]+(\s+DH=)[^\s]+(\s+DS=)[^\s]+/i,
+      `$1${fmtTCN(EL.DL)}$2${fmtTCN(EL.DH)}$3${fmtTCN(EL.DS)}`);
+    reparseTemplate();
+    return;
+  }
   buildScene();if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
 }
 
@@ -2038,6 +2217,9 @@ function rawSetParam(line,param,value){
 }
 
 function buildTCNText(){
+  // Template mode: dims and VAR edits are already applied to _rawTCN;
+  // everything else (IF blocks, hidden ops, formulas) is preserved verbatim.
+  if(_isTemplate&&_rawTCN)return _rawTCN;
   const errOps=OPS.filter(o=>o.errors&&o.errors.length);
   if(errOps.length){
     const faceNum={TOP:1,BOTTOM:2,FRONT:3,RIGHT:4,BACK:5,LEFT:6};
@@ -2205,7 +2387,7 @@ async function saveTCN(){
   if(fileHandle){
     try{
       const w=await fileHandle.createWritable();
-      await w.write(txt);await w.close();
+      await w.write(tcnOutData(txt));await w.close();
       await IDB.set('lastHandle',fileHandle);
       brInvalidateThumb(fileName);
       showToast('✓ Zapisano: '+fileName);return;
@@ -2227,7 +2409,7 @@ async function saveTCNAs(){
         types:[{description:'TCN files',accept:{'text/plain':['.TCN','.tcn']}}]
       });
       const w=await h.createWritable();
-      await w.write(txt);await w.close();
+      await w.write(tcnOutData(txt));await w.close();
       fileHandle=h;fileName=h.name;
       await IDB.set('lastHandle',h);
       brInvalidateThumb(fileName);
@@ -2245,7 +2427,7 @@ async function saveTCNAs(){
 
 function downloadTCN(txt,name){
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));
+  a.href=URL.createObjectURL(new Blob([tcnOutData(txt)],{type:'text/plain'}));
   a.download=name;a.click();
 }
 
@@ -2628,7 +2810,7 @@ async function brRenderThumb(f,cv,el){
       const mt=el?.querySelector('.fb-meta');
       if(mt)mt.textContent=new Date(f.lastModified).toLocaleDateString('pl');
     }
-    const txt=await file.text();
+    const txt=(await readTcnText(file)).txt;
     const dataURL=brDrawThumb(txt,cv.width,cv.height);
     if(dataURL){
       brThumbCache.set(f.name,dataURL);
@@ -2647,9 +2829,16 @@ function drawCachedThumb(name,cv){
 function brDrawThumb(txt,W,H){
   // Normalise commas
   const t=txt.replace(/(#[\w]+=)([\d,.\-]+)/g,(_,p,v)=>p+v.replace(/,/g,'.'));
-  const dim=t.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)/i);
+  const dim=t.match(/::UNm\s+DL=([\d.\-]+)\s+DH=([\d.\-]+)(?:\s+DS=([\d.\-]+))?/i);
   if(!dim)return null;
   const DL=parseFloat(dim[1]),DH=parseFloat(dim[2]);
+  const DS=dim[3]!=null?parseFloat(dim[3]):EL.DS;
+  // Resolve this file's own r variables (VAR{}) for formula evaluation
+  const _rv={};
+  parseVarSection(t).vars.forEach(v=>{
+    const num=evalTcnExpr(v.value,{DL,DH,DS,R:_rv});
+    if(num!==null)_rv['r'+v.idx]=num;
+  });
   const oc=document.createElement('canvas');oc.width=W;oc.height=H;
   const c=oc.getContext('2d');
   const d=dk();
@@ -2696,12 +2885,12 @@ function brDrawThumb(txt,W,H){
     const lm=sm2[2].match(/\$=(\w+)/);
     if(lm){const lk=lm[1].toLowerCase();if(sideByLabel[lk])side=sideByLabel[lk];}
     if(side!=='TOP')continue; // only TOP in thumbnail for now
-    const body=sm2[2];
-
-    // Helper resolving l/h/s variables
-    const _td={DL,DH,DS:EL.DS};
-    const gp=(k)=>{const m=body.match(new RegExp('#'+k+'=([^\\s}]+)'));return m?evalTcnExpr(m[1],_td):null;};
-    const gpRaw=(raw,k)=>{const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));return m?evalTcnExpr(m[1],_td):null;};
+    // Helper context resolving l/h/s, face x/y/z and r variables
+    const _td={DL,DH,DS,R:_rv};
+    // Drop W-blocks hidden by unmet IF conditions before scanning
+    const body=filterLogicBody(sm2[2],_td,side);
+    const gp=(k)=>{const m=body.match(new RegExp('#'+k+'=([^\\s}]+)'));return m?evalTcnExpr(m[1],_td,side):null;};
+    const gpRaw=(raw,k)=>{const m=raw.match(new RegExp('#'+k+'=([^\\s}]+)'));return m?evalTcnExpr(m[1],_td,side):null;};
 
     // Drills
     const drRe=/W#81\{([^}]+)\}/g;let dm;
@@ -2944,14 +3133,54 @@ async function setupFileLoading(){
   });
 }
 
+/* Decode a TCN file: TpaCAD ≥2.x saves 'code=unicode' files as UTF-16 with
+   a BOM; older EdiCad files are ANSI/UTF-8. Detected encoding is kept for save. */
+async function readTcnText(f){
+  const buf=await f.arrayBuffer();
+  const b=new Uint8Array(buf);
+  let enc='utf-8';
+  if(b.length>1&&b[0]===0xFF&&b[1]===0xFE)enc='utf-16le';
+  else if(b.length>1&&b[0]===0xFE&&b[1]===0xFF)enc='utf-16be';
+  else{
+    // no BOM: NUL bytes in the first bytes betray UTF-16 anyway
+    let z=0;const n=Math.min(b.length,256);
+    for(let i=0;i<n;i++)if(b[i]===0)z++;
+    if(z>n/4)enc=(b.length>1&&b[1]===0)?'utf-16le':'utf-16be';
+  }
+  const txt=new TextDecoder(enc).decode(buf).replace(/^﻿/,'');
+  return {txt,enc};
+}
+
+/* Encode TCN text for writing in the given encoding (with BOM for UTF-16). */
+function encodeTcnText(txt,enc){
+  if(enc==='utf-16le'||enc==='utf-16be'){
+    const le=enc==='utf-16le';
+    const u=new Uint8Array(txt.length*2+2);
+    u[0]=le?0xFF:0xFE;u[1]=le?0xFE:0xFF;
+    for(let i=0;i<txt.length;i++){
+      const c=txt.charCodeAt(i);
+      u[2+i*2]=le?(c&0xFF):(c>>8);
+      u[3+i*2]=le?(c>>8):(c&0xFF);
+    }
+    return u;
+  }
+  return txt;
+}
+
+/* Encode using the encoding of the currently loaded file. */
+function tcnOutData(txt){return encodeTcnText(txt,fileEncoding);}
+
 async function loadFile(f){
   try{
-    const txt=await f.text();
+    const {txt,enc}=await readTcnText(f);
+    fileEncoding=enc;
     cameraFitted=false;
-    parseTCN(txt);setLoadedState(true,f.name);
-    renderOps();renderEdgeInfo();buildScene(true);if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();showToast('✓ Wczytano: '+f.name);
+    parseTCN(txt);setLoadedState(true,f.name);applyTemplateUI();
+    renderOps();renderEdgeInfo();buildScene(true);if(curView==='code')refreshCodeView();else if(curView!=='3d')draw2D();
+    showToast(_isTemplate?'✓ Wczytano szablon parametryczny: '+f.name:'✓ Wczytano: '+f.name);
   }catch(err){
     console.error(err);OPS=[];EL={DL:0,DH:0,DS:0};setLoadedState(false,'');
+    RVARS=[];RVAL={};_isTemplate=false;renderRVars();applyTemplateUI();
     renderOps();buildScene();draw2D();showToast('Błąd: '+err.message,true);
   }
 }
@@ -3104,11 +3333,14 @@ const GEN_BASE_DEFS=[
 
 const escA=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
-/* Uzupełnia brakujące pola elementu (definicje zapisane starszą wersją) */
+/* Uzupełnia brakujące pola elementu (definicje zapisane starszą wersją).
+   rvars: mapowanie zmiennych r szablonu TCN → wzory szafki, np. {0:'T',1:'N'} */
 function genElNorm(el){
-  return Object.assign({name:'Element',qty:'1',dl:'W-2*T',dh:'D',ds:'T',
+  const e=Object.assign({name:'Element',qty:'1',dl:'W-2*T',dh:'D',ds:'T',
     kolor:'',sloje:'tak',opis:'',edgeF:'',edgeB:'',edgeL:'',edgeR:'',
-    tpl:null,tplName:''},el);
+    tpl:null,tplName:'',rvars:null},el);
+  if(!e.rvars||typeof e.rvars!=='object')e.rvars={};
+  return e;
 }
 /* Uzupełnia brakujące pola szafki; migracja: stare szafki dostają parametr N (ilość półek) */
 function genCabNorm(c){
@@ -3138,17 +3370,28 @@ function genRenderParams(){
   if(!grid)return;
   grid.innerHTML='';
   const c=genCab();if(!c)return;
-  const add=(label,key,val,onch)=>{
+  const add=(label,key,inner)=>{
     const d=document.createElement('div');
     d.className='dimf gen-param';
-    d.innerHTML=`<label>${escA(label)} <b style="color:var(--pri)">${escA(key)}</b></label>`+
-      `<input type="number" id="gen-par-${escA(key)}" value="${val}" step="any" onchange="${onch}">`;
+    d.innerHTML=`<label>${escA(label)} <b style="color:var(--pri)">${escA(key)}</b></label>`+inner;
     grid.appendChild(d);
   };
-  GEN_BASE_DEFS.forEach(bd=>add(bd.label,bd.key,+c.base[bd.key]||bd.def,`genBaseDef('${bd.key}',this.value)`));
-  c.params.forEach((p,i)=>add(p.label,p.key,+p.def||0,`genParamDef(${i},this.value)`));
+  GEN_BASE_DEFS.forEach(bd=>add(bd.label,bd.key,
+    `<input type="number" id="gen-par-${escA(bd.key)}" value="${+c.base[bd.key]||bd.def}" step="any" onchange="genBaseDef('${bd.key}',this.value)">`));
+  c.params.forEach((p,i)=>{
+    if(p.type==='list'&&Array.isArray(p.options)&&p.options.length){
+      // lista: wybrana opcja daje wartość liczbową = pozycja na liście (0,1,2…)
+      const def=Math.min(Math.max(0,Math.round(+p.def||0)),p.options.length-1);
+      add(p.label,p.key,`<select id="gen-par-${escA(p.key)}" class="gen-sel" onchange="genParamDef(${i},this.value)">`+
+        p.options.map((o,k)=>`<option value="${k}"${k===def?' selected':''}>${escA(o)}</option>`).join('')+'</select>');
+    } else {
+      add(p.label,p.key,`<input type="number" id="gen-par-${escA(p.key)}" value="${+p.def||0}" step="any" onchange="genParamDef(${i},this.value)">`);
+    }
+  });
 }
-/* Edytor parametrów w "Ustawieniach szafki" – podstawowe (nieusuwalne) + własne */
+/* Edytor parametrów w "Ustawieniach szafki" – podstawowe (nieusuwalne) + własne.
+   Parametr własny może być liczbą albo listą opcji: wybrana opcja daje
+   wartość liczbową równą jej pozycji na liście (0, 1, 2, …). */
 function genRenderParamsDef(){
   const tb=document.getElementById('gen-par-def-tbody');
   if(!tb)return;
@@ -3156,16 +3399,57 @@ function genRenderParamsDef(){
   const baseRows=GEN_BASE_DEFS.map(bd=>`<tr>
     <td style="min-width:160px">${escA(bd.label)}</td>
     <td style="text-align:center"><b style="color:var(--pri)">${bd.key}</b></td>
+    <td>liczba</td>
     <td><input type="number" step="any" value="${+c.base[bd.key]||bd.def}" onchange="genBaseDef('${bd.key}',this.value)"></td>
     <td class="td-del"><span class="otb" title="Parametr podstawowy – nieusuwalny">podst.</span></td>
   </tr>`).join('');
-  const ownRows=(c.params||[]).map((p,i)=>`<tr>
+  const ownRows=(c.params||[]).map((p,i)=>{
+    const isList=p.type==='list';
+    const typeSel=`<select onchange="genParamType(${i},this.value)">
+      <option value="num"${!isList?' selected':''}>liczba</option>
+      <option value="list"${isList?' selected':''}>lista</option>
+    </select>`;
+    const defCell=isList
+      ?`<div style="display:grid;gap:4px">
+          <input type="text" style="min-width:220px" value="${escA((p.options||[]).join(', '))}"
+            title="Opcje oddzielone przecinkami – wartości: ${(p.options||[]).map((o,k)=>k+'='+o).join(', ')||'brak'}"
+            placeholder="np. Bok widoczny, Bok niewidoczny" onchange="genParamOpts(${i},this.value)">
+          <select onchange="genParamDef(${i},this.value)" title="Opcja domyślna">
+            ${(p.options||[]).map((o,k)=>`<option value="${k}"${(+p.def||0)===k?' selected':''}>${k} = ${escA(o)}</option>`).join('')}
+          </select>
+        </div>`
+      :`<input type="number" step="any" value="${+p.def||0}" onchange="genParamDef(${i},this.value)">`;
+    return `<tr>
     <td><input type="text" style="min-width:160px" value="${escA(p.label)}" onchange="genParamLabel(${i},this.value)"></td>
     <td style="text-align:center"><b style="color:var(--pri)">${escA(p.key)}</b></td>
-    <td><input type="number" step="any" value="${+p.def||0}" onchange="genParamDef(${i},this.value)"></td>
+    <td>${typeSel}</td>
+    <td>${defCell}</td>
     <td class="td-del"><button class="btn-del" onclick="genDelParam(${i})">✕</button></td>
-  </tr>`).join('');
+  </tr>`;}).join('');
   tb.innerHTML=baseRows+ownRows;
+}
+function genParamType(i,v){
+  const c=genCab();if(!c?.params[i])return;
+  const p=c.params[i];
+  p.type=v==='list'?'list':'num';
+  if(p.type==='list'){
+    if(!Array.isArray(p.options)||!p.options.length)p.options=['Opcja 1','Opcja 2'];
+    p.def=Math.min(Math.max(0,Math.round(+p.def||0)),p.options.length-1);
+  }
+  genRenderParams();
+  genRenderParamsDef();
+  genPersist();
+}
+function genParamOpts(i,v){
+  const c=genCab();if(!c?.params[i])return;
+  const p=c.params[i];
+  const opts=String(v).split(',').map(s=>s.trim()).filter(Boolean);
+  if(!opts.length){showToast('Lista musi mieć przynajmniej jedną opcję',true);genRenderParamsDef();return;}
+  p.options=opts;
+  p.def=Math.min(Math.max(0,Math.round(+p.def||0)),opts.length-1);
+  genRenderParams();
+  genRenderParamsDef();
+  genPersist();
 }
 function genBaseDef(key,v){
   const c=genCab();if(!c)return;
@@ -3211,7 +3495,11 @@ function genDelParam(i){
 }
 function genParamDef(i,v){
   const c=genCab();if(!c?.params[i])return;
-  c.params[i].def=parseFloat(v)||0;
+  const p=c.params[i];
+  let n=parseFloat(v)||0;
+  if(p.type==='list'&&Array.isArray(p.options))
+    n=Math.min(Math.max(0,Math.round(n)),p.options.length-1);
+  p.def=n;
   genRenderParams();
   genRenderParamsDef();
   genPersist();
@@ -3259,10 +3547,17 @@ function genBuildList(){
     const dl=genEval(el.dl,vars),dh=genEval(el.dh,vars),ds=genEval(el.ds,vars)??T;
     if(dl===null||dh===null||dl<=0||dh<=0){if(q>0)bad.push(el.name);return;}
     if(q<1)return;
+    // zmienne r szablonu: wylicz wzory (np. r1=N) → wartości do VAR pliku
+    const rvals={};
+    Object.entries(el.rvars||{}).forEach(([idx,expr])=>{
+      const v=genEval(expr,vars);
+      if(v===null)bad.push(el.name+' (r'+idx+'='+expr+')');else rvals[idx]=v;
+    });
     genRows.push({id:genRowId++,name:el.name,qty:q,dl,dh,ds,
       kolor:el.kolor,sloje:el.sloje||'tak',opis:el.opis,
       edgeF:el.edgeF,edgeB:el.edgeB,edgeL:el.edgeL,edgeR:el.edgeR,
-      cabCode:cab.code||'',tpl:el.tpl||null,tplName:el.tplName||el.tpl?.name||null,fileName:null});
+      cabCode:cab.code||'',tpl:el.tpl||null,tplName:el.tplName||el.tpl?.name||null,
+      rvals:Object.keys(rvals).length?rvals:null,fileName:null});
   });
   if(bad.length)showToast('Błędny wzór lub wymiar ≤0: '+bad.join(', '),true);
   genRenderRows();
@@ -3380,12 +3675,14 @@ function genCfgSerialize(){
     cabinets:genCabinets.map(genCabNorm).map(c=>({
       id:c.id,name:c.name,code:c.code||'',
       base:c.base,
-      params:(c.params||[]).map(p=>({key:p.key,label:p.label,def:p.def})),
+      params:(c.params||[]).map(p=>({key:p.key,label:p.label,def:p.def,
+        type:p.type||'num',options:Array.isArray(p.options)?p.options:undefined})),
       els:c.els.map(el=>({
         name:el.name,qty:el.qty,dl:el.dl,dh:el.dh,ds:el.ds,
         kolor:el.kolor,sloje:el.sloje,opis:el.opis,
         edgeF:el.edgeF,edgeB:el.edgeB,edgeL:el.edgeL,edgeR:el.edgeR,
         tplName:el.tplName||el.tpl?.name||null,
+        rvars:Object.keys(el.rvars||{}).length?el.rvars:undefined,
       })),
     })),
   },null,2);
@@ -3410,10 +3707,11 @@ async function genExportCfg(verbose){
       if(!el.tpl||done.has(el.tplName||el.tpl.name))continue;
       try{
         const name=el.tplName||el.tpl.name;
-        const txt=await (await el.tpl.getFile()).text();
+        // kopia bajt w bajt – szablony UTF-16 z TpaCAD nie mogą przejść przez .text()
+        const buf=await (await el.tpl.getFile()).arrayBuffer();
         const tfh=await tplDir.getFileHandle(name,{create:true});
         const tw=await tfh.createWritable();
-        await tw.write(txt);await tw.close();
+        await tw.write(buf);await tw.close();
         done.add(name);
       }catch(e){console.warn('kopia szablonu:',e);}
     }
@@ -3519,13 +3817,16 @@ async function genImportCfgFetch(){
 async function genFetchTplText(name,cache){
   const key='fetch:'+name;
   if(cache.has(key))return cache.get(key);
-  let txt=null;
+  let res={txt:null,enc:'utf-8'};
   try{
     const r=await fetch(GEN_CFG_TPLDIR+'/'+encodeURIComponent(name),{cache:'no-store'});
-    if(r.ok)txt=await r.text();
+    if(r.ok){
+      const ab=await r.arrayBuffer();
+      res=await readTcnText({arrayBuffer:async()=>ab});
+    }
   }catch(e){}
-  cache.set(key,txt);
-  return txt;
+  cache.set(key,res);
+  return res;
 }
 function genToggleOpts(){
   const p=document.getElementById('gen-opts-box');
@@ -3610,7 +3911,10 @@ function genRenderDefs(){
   if(!tb)return;
   const c=genCab();
   const txt=(el,i,f,w)=>`<td><input type="text" style="min-width:${w}px;width:${w}px;text-align:center" value="${escA(el[f])}" onchange="genDefUpd(${i},'${f}',this.value)"></td>`;
-  tb.innerHTML=(c?.els||[]).map(genElNorm).map((el,i)=>`<tr>
+  tb.innerHTML=(c?.els||[]).map(genElNorm).map((el,i)=>{
+    const hasTpl=el.tpl||el.tplName;
+    const nMapped=Object.values(el.rvars||{}).filter(v=>String(v).trim()!=='').length;
+    return `<tr>
     <td><input type="text" style="min-width:90px;width:90px" value="${escA(el.kolor)}" onchange="genDefUpd(${i},'kolor',this.value)"></td>
     <td><select onchange="genDefUpd(${i},'sloje',this.value)"><option value="tak"${el.sloje!=='nie'?' selected':''}>tak</option><option value="nie"${el.sloje==='nie'?' selected':''}>nie</option></select></td>
     ${txt(el,i,'dl',90)}
@@ -3625,10 +3929,58 @@ function genRenderDefs(){
     ${txt(el,i,'ds',55)}
     <td style="white-space:nowrap">
       <button class="btn btn-sec" style="font-size:var(--txs);padding:3px 8px" onclick="genDefPickTpl(${i})" title="Wybierz plik szablonu TCN">📄</button>
-      <span style="font-size:var(--txs);color:${el.tpl||el.tplName?'var(--ok)':'var(--faint)'}" title="${escA(el.tpl?.name||el.tplName||'')}">${escA(el.tpl?.name||el.tplName||'pusty TCN')}</span>
+      ${hasTpl?`<button class="btn btn-sec" style="font-size:var(--txs);padding:3px 8px${genRvarOpen.has(i)?';background:var(--pri);color:#fff':''}" onclick="genToggleRvars(${i})" title="Zmienne r szablonu (VAR) – przypisz wzory szafki">r${nMapped?'·'+nMapped:''}</button>`:''}
+      <span style="font-size:var(--txs);color:${hasTpl?'var(--ok)':'var(--faint)'}" title="${escA(el.tpl?.name||el.tplName||'')}">${escA(el.tpl?.name||el.tplName||'pusty TCN')}</span>
     </td>
     <td class="td-del"><button class="btn-del" onclick="genDefDelEl(${i})">✕</button></td>
-  </tr>`).join('');
+  </tr>
+  <tr id="gen-rvar-row-${i}" style="display:${genRvarOpen.has(i)?'':'none'}"><td colspan="14" style="padding:0"><div id="gen-rvar-cell-${i}" style="padding:var(--s2) var(--s3);background:var(--surf2)"></div></td></tr>`;
+  }).join('');
+  genRvarOpen.forEach(i=>genRenderRvarCell(i));
+}
+
+/* ── Zmienne r szablonu przy elemencie ──────────────────────────── */
+let genRvarOpen=new Set(); // indeksy elementów z rozwiniętym panelem zmiennych r
+function genToggleRvars(i){
+  if(genRvarOpen.has(i))genRvarOpen.delete(i);else genRvarOpen.add(i);
+  genRenderDefs();
+}
+/* Czyta sekcję VAR z szablonu elementu i buduje wiersz z polami wzorów.
+   W pole można wpisać wzór szafki (H, W, D, T, N…) – wyliczona wartość
+   trafi do VAR generowanego pliku. Puste pole = wartość z szablonu. */
+async function genRenderRvarCell(i){
+  const cell=document.getElementById('gen-rvar-cell-'+i);
+  if(!cell)return;
+  const c=genCab();const el=c?.els[i]?genElNorm(c.els[i]):null;
+  if(!el){cell.innerHTML='';return;}
+  cell.innerHTML='<span class="gen-note" style="margin:0">Czytam szablon…</span>';
+  let tpl=await genGetTplText(el.tpl,new Map());
+  if(tpl.txt===null&&!el.tpl&&el.tplName&&genCfgViaFetch)
+    tpl=await genFetchTplText(el.tplName,new Map());
+  if(tpl.txt===null){
+    cell.innerHTML='<span class="gen-note" style="margin:0;color:var(--warn,#f59e0b)">Nie udało się odczytać szablonu (brak uprawnień?) – kliknij 📄 i wybierz plik ponownie.</span>';
+    return;
+  }
+  const vars=parseVarSection(tpl.txt).vars;
+  if(!vars.length){
+    cell.innerHTML='<span class="gen-note" style="margin:0">Szablon nie ma sekcji VAR (zmiennych r).</span>';
+    return;
+  }
+  cell.innerHTML='<div style="display:flex;gap:var(--s3);flex-wrap:wrap;align-items:flex-end">'+
+    vars.map(v=>`<div class="dimf" style="min-width:150px;max-width:220px">
+      <label><b style="color:var(--pri)">r${v.idx}</b> ${escA(v.name||'')}${v.desc?' – '+escA(v.desc):''}</label>
+      <input type="text" placeholder="${escA(v.value)} (z szablonu)" value="${escA(el.rvars[v.idx]??'')}"
+        title="Wzór szafki, np. T, N, H/2. Puste = wartość z szablonu (${escA(v.value)})"
+        onchange="genRvarUpd(${i},${v.idx},this.value)">
+    </div>`).join('')+
+    '</div><div class="gen-note" style="margin:var(--s2) 0 0">Wpisz wzór z parametrów szafki (H, W, D, T + własne). Wyliczona wartość zostanie wpisana do sekcji VAR generowanego pliku TCN.</div>';
+}
+function genRvarUpd(i,idx,val){
+  const c=genCab();if(!c?.els[i])return;
+  c.els[i]=genElNorm(c.els[i]);
+  const v=String(val).trim();
+  if(v==='')delete c.els[i].rvars[idx];else c.els[i].rvars[idx]=v;
+  genPersist();
 }
 const GEN_DEF_TXT=['name','kolor','opis','sloje']; // pola bez trim wzorów
 function genDefUpd(i,f,v){
@@ -3652,31 +4004,49 @@ async function genDefPickTpl(i){
     c.els[i]=genElNorm(c.els[i]);
     c.els[i].tpl=h;
     c.els[i].tplName=h.name;
+    genRvarOpen.add(i); // po wyborze pliku od razu pokaż jego zmienne r
     genRenderDefs();
     genPersist();
   }catch(e){if(e.name!=='AbortError')console.error(e);}
 }
 
-/* Czyta szablon z uchwytu pliku; cache przekazywany per operacja zapisu */
+/* Czyta szablon z uchwytu pliku; cache przekazywany per operacja zapisu.
+   Zwraca {txt,enc} – kodowanie (ANSI/UTF-16 z TpaCAD) zachowujemy w plikach wynikowych. */
 async function genGetTplText(h,cache){
-  if(!h)return null;
+  if(!h)return {txt:null,enc:'utf-8'};
   if(cache.has(h))return cache.get(h);
-  let txt=null;
+  let res={txt:null,enc:'utf-8'};
   try{
     let p=await h.queryPermission({mode:'read'});
     if(p!=='granted')p=await h.requestPermission({mode:'read'});
-    if(p==='granted')txt=await (await h.getFile()).text();
+    if(p==='granted')res=await readTcnText(await h.getFile());
   }catch(e){console.warn('szablon '+(h.name||'?')+':',e);}
-  cache.set(h,txt);
-  return txt;
+  cache.set(h,res);
+  return res;
 }
 
-/* Podmienia wymiary w szablonie TCN; bez szablonu buduje minimalny plik */
+/* Wpisuje wyliczone wartości zmiennych r do sekcji VAR szablonu.
+   Linia VAR: #idx=wartość|nazwa|w|f|opis – podmieniamy tylko wartość. */
+function genApplyRVars(txt,rvals,fmt){
+  if(!rvals)return txt;
+  const vm=txt.match(/(^|\n)(\s*VAR\{)([\s\S]*?)(\}VAR)/);
+  if(!vm)return txt;
+  let block=vm[3];
+  Object.entries(rvals).forEach(([idx,val])=>{
+    if(val==null||isNaN(val))return;
+    block=block.replace(new RegExp('(^|\\n)(\\s*#'+idx+'=)[^|\\r\\n]*'),
+      (_,nl,tag)=>nl+tag+fmt(val));
+  });
+  return txt.replace(vm[0],vm[1]+vm[2]+block+vm[4]);
+}
+
+/* Podmienia wymiary (i zmienne r) w szablonie TCN; bez szablonu buduje minimalny plik */
 function genMakeTCN(tplTxt,r){
   if(tplTxt&&/::UNm/i.test(tplTxt)){
     const sep=/DL=\d+,\d/.test(tplTxt)?',':'.';
     const f=v=>{const s=parseFloat((+v).toFixed(4)).toString();return sep===','?s.replace('.',','):s;};
-    return tplTxt.replace(/(::UNm\s+DL=)[^\s]+(\s+DH=)[^\s]+(\s+DS=)[^\s]+/i,
+    return genApplyRVars(tplTxt,r.rvals,f)
+      .replace(/(::UNm\s+DL=)[^\s]+(\s+DH=)[^\s]+(\s+DS=)[^\s]+/i,
       `$1${f(r.dl)}$2${f(r.dh)}$3${f(r.ds)}`);
   }
   const f=v=>parseFloat((+v).toFixed(4)).toString();
@@ -3721,15 +4091,15 @@ async function genWriteFiles(){
     n++;
     const code=n.toString(base).toUpperCase();
     if(code.length>GEN_CODE_MAX){showToast('Przekroczono maks. '+GEN_CODE_MAX+' cyfr kodu',true);break;}
-    let tplTxt=await genGetTplText(r.tpl,tplCache);
+    let tpl=await genGetTplText(r.tpl,tplCache);
     // Ustawienia z katalogu aplikacji (fetch): szablon czytamy z szablony/<nazwa>
-    if(tplTxt===null&&!r.tpl&&r.tplName&&genCfgViaFetch)tplTxt=await genFetchTplText(r.tplName,tplCache);
-    if((r.tpl||r.tplName)&&tplTxt===null)tplFail.add(r.tpl?.name||r.tplName||'?');
-    const txt=genMakeTCN(tplTxt,r);
+    if(tpl.txt===null&&!r.tpl&&r.tplName&&genCfgViaFetch)tpl=await genFetchTplText(r.tplName,tplCache);
+    if((r.tpl||r.tplName)&&tpl.txt===null)tplFail.add(r.tpl?.name||r.tplName||'?');
+    const txt=genMakeTCN(tpl.txt,r);
     try{
       const fh=await outDir.getFileHandle(code+'.TCN',{create:true});
       const w=await fh.createWritable();
-      await w.write(txt);await w.close();
+      await w.write(encodeTcnText(txt,tpl.enc));await w.close();
       r.fileName=code+'.TCN'; // plik bez '%'; '%' tylko w kodzie kreskowym
       written++;
     }catch(e){showToast('Błąd zapisu '+code+'.TCN: '+e.message,true);break;}

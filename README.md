@@ -27,6 +27,20 @@ Lewy panel pozwala wskazać folder na dysku i przeglądać pliki `.TCN` jako min
 - Zapis do oryginalnego pliku (File System Access API) lub „Zapisz jako…"
 - Tworzenie nowego pliku od zera
 
+### Pliki parametryczne (szablony)
+Aplikacja otwiera pliki parametryczne zapisane w TpaCAD (`'code=unicode`, UTF-16):
+- **Wzory we współrzędnych** – `x`, `y`, `z` (wymiary płaszczyzny wg konwencji TPA: TOP x=DL/y=DH, FRONT/BACK x=DL/y=DS, LEFT/RIGHT x=DH/y=DS), `l`, `h`, `s` (wymiary elementu) oraz arytmetyka, np. `x/2-9`, `y-37`, `x-(r0/2)-0.5`
+- **Zmienne `r`** – sekcja `VAR{}` (`r0`, `r1`, …) z nazwami; edytowalne w panelu „Zmienne (VAR)" – po zmianie wszystkie wzory i warunki przeliczają się na żywo
+- **Instrukcje logiczne IF/ELSE/ENDIF** (`W#2001`/`W#2005`/`W#2002`) – operacje w nieaktywnych gałęziach są ukrywane, np. rzędy otworów pod półki pojawiają się w zależności od wartości `r1` (ilość półek); warunek: do 3 termów `(e1) ? (e2)` z operatorami `< <= > >= = <>` łączonymi And/Or
+- **Tryb szablonu** – plik z instrukcjami logicznymi jest przy zapisie zachowywany w oryginalnej strukturze (wzory i ukryte operacje nie giną); z poziomu TPA-Viewera koryguje się tylko wymiary elementu i wartości zmiennych `r`. Obrót i dodawanie operacji są w tym trybie zablokowane, a przy nazwie pliku pojawia się znacznik „⚙wzory"
+
+### Generator szafek
+Zakładka „Generator szafek" składa listę formatek z definicji szafki (wzory wymiarów z parametrami `H/W/D/T` + własnymi) i zapisuje pliki TCN o kolejnych numerach (hex/dec) do wskazanego katalogu, z etykietami i kodami kreskowymi:
+- **Szablony TCN per element** – przy generowaniu w szablonie podmieniane są wymiary (`::UNm`) oraz **zmienne `r`** z sekcji `VAR{}`: przycisk **r** przy szablonie pokazuje jego zmienne (r0, r1, …) i pozwala przypisać im wzory szafki, np. `r0=T`, `r1=N` – wyliczona wartość trafia do pliku wynikowego
+- **Parametry typu lista** – parametr szafki może być listą rozwijaną (np. „Bok widoczny / Bok niewidoczny"); wybrana opcja daje wartość liczbową równą pozycji na liście (0, 1, 2, …) do użycia we wzorach i zmiennych `r`
+- Kodowanie szablonu (ANSI/UTF-16) jest zachowywane w plikach wynikowych
+- Konfiguracja (szafki, parametry, narzędzia) zapisuje się do `ustawienia.json` + `szablony/` i przenosi gitem między komputerami
+
 ### Okleina krawędzi
 Aplikacja odczytuje i wyświetla informacje o okleinowaniu krawędzi (EDGER, EDGEL, EDGET, EDGEB) z sekcji `SPEC{}` pliku.
 
@@ -67,9 +81,11 @@ Aplikacja parsuje pliki `.TCN` w formacie TPA:
 - `W#81{…}W` – nawiert
 - `W#89{…}W` + `W#2201{…}W` – frezowanie (start + kolejne punkty)
 - `W#1050{…}W` – piłka
+- `W#2001{…}W` / `W#2005{…}W` / `W#2002{…}W` – IF / ELSE / ENDIF (pola: `#8070 ? #8073` z operatorem w `#8060`, termy 2–3: `#8071/#8074/#8061`, `#8072/#8075/#8062`, łączniki And/Or `#8065`/`#8066`)
+- `VAR{…}VAR` – zmienne `r` (`#idx=wartość|nazwa|w|f|opis`)
 - `SPEC{…}SPEC` – okleina krawędzi
 
-Obsługiwane są pliki z separatorem dziesiętnym zarówno kropką, jak i przecinkiem – separator jest wykrywany automatycznie i zachowywany przy zapisie.
+Obsługiwane są pliki z separatorem dziesiętnym zarówno kropką, jak i przecinkiem – separator jest wykrywany automatycznie i zachowywany przy zapisie. Kodowanie pliku (ANSI/UTF-8 lub UTF-16 „unicode" z TpaCAD) jest wykrywane po BOM i zachowywane przy zapisie.
 
 ## Technologie
 
