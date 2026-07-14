@@ -1,0 +1,15 @@
+{
+  // Pliki danych aplikacji – ich zapis NIE może przeładowywać strony w Live Server
+  "liveServer.settings.ignoreFiles": [
+    "**/ustawienia.json",
+    "**/szafki.json",
+    "**/szablony/**",
+    "**/*.TCN",
+    "**/*.tcn",
+    ".vscode/**",
+    ".claude/**"
+  ],
+  // Live Preview nie ma listy ignorowanych plików – wyłączamy auto-odświeżanie
+  // (po edycji index.html odśwież podgląd ręcznie: F5 / przycisk odświeżania)
+  "livePreview.autoRefreshPreview": "Never"
+}

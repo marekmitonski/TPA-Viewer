@@ -292,9 +292,9 @@ main{display:flex;overflow:hidden}
     <div class="gen-wrap">
       <nav class="mtabs" style="display:inline-flex;margin-bottom:var(--s4)">
         <button class="mtab act" id="gen-mode-run" onclick="genSetMode('run')">Generuj szafki</button>
-        <button class="mtab" id="gen-mode-edit" onclick="genSetMode('edit')">Edytuj szafki</button>
+        <button class="mtab" id="gen-mode-edit" onclick="genSetMode('edit')">Konstruktor szafek</button>
       </nav>
-      <div class="box">
+      <div class="box" id="gen-cab-box">
         <h3>🗄 Rodzaj szafki</h3>
         <div style="display:flex;gap:var(--s2);align-items:flex-end;flex-wrap:wrap">
           <div class="dimf" style="flex:1;min-width:220px;max-width:420px"><label>Wybierz szafkę</label><select id="gen-cab-run" class="gen-sel" onchange="genSelCab(+this.value)"></select></div>
@@ -303,6 +303,36 @@ main{display:flex;overflow:hidden}
             <button class="btn btn-sec" onclick="genDelCab()">− Usuń szafkę</button>
             <button class="btn btn-sec" id="gen-opts-toggle" onclick="genToggleOpts()">✎ Edytuj szafkę</button>
           </span>
+        </div>
+      </div>
+      <div class="box" id="gen-proj-box" style="display:none">
+        <div style="display:flex;gap:var(--s2);align-items:center;margin-bottom:var(--s3)">
+          <h3 style="margin:0">📋 Projekty</h3>
+          <button class="btn btn-p" onclick="genAddProj()" style="margin-left:auto">＋ Nowy projekt</button>
+        </div>
+        <div id="gen-proj-list" style="display:grid;gap:4px;margin-bottom:var(--s3)"></div>
+        <div id="gen-proj-open" style="display:none">
+          <div class="ogt" id="gen-proj-title" style="margin-bottom:var(--s2)"></div>
+          <div id="gen-proj-cabs"></div>
+          <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:center;flex-wrap:wrap">
+            <button class="btn btn-sec" onclick="genProjAddCab()">＋ Dodaj szafkę do projektu</button>
+            <button class="btn btn-p" onclick="genBuildList()">Generuj formatki i pliki TCN</button>
+            <span class="gen-note" style="margin:0">Rodzaje szafek i parametry edytujesz w „Konstruktorze szafek”.</span>
+          </div>
+          <div id="gen-list-box" style="display:none;margin-top:var(--s4);border-top:1px solid var(--bord);padding-top:var(--s3)">
+            <div class="ogt" style="margin-bottom:var(--s2)">Formatki</div>
+            <div class="gen-table-wrap">
+            <table class="gen-table">
+              <thead><tr><th>Kolor płyty</th><th>Słoje</th><th>Długość</th><th>Szerokość</th><th>Ilość</th><th>Nazwa</th><th>Kod szafki</th><th>Opis</th><th>Dł. front</th><th>Dł. tył</th><th>Szer. lewa</th><th>Szer. prawa</th><th>Plik</th><th>Kod kreskowy</th><th></th></tr></thead>
+              <tbody id="gen-tbody"></tbody>
+            </table>
+            </div>
+            <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:center;flex-wrap:wrap">
+              <button class="btn btn-sec" onclick="genAddRow()">+ Formatka</button>
+              <span class="fbr-status" id="gen-outdir-status">Pliki TCN trafią do katalogu z paska plików</span>
+              <button class="btn btn-sec" id="gen-print-btn" onclick="genPrint()" disabled style="margin-left:auto">🖨 Drukuj kody</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="box" id="gen-opts-box" style="display:none">
@@ -314,6 +344,11 @@ main{display:flex;overflow:hidden}
             <option value="16">szesnastkowy (16)</option>
             <option value="10">dziesiętny (10)</option>
           </select></div>
+          <div style="display:flex;gap:var(--s2);align-items:center">
+            <img id="gen-cab-img" src="" alt="" style="display:none;width:90px;height:68px;object-fit:contain;border:1px solid var(--bord);border-radius:6px;background:var(--surf2)">
+            <button class="btn btn-sec" onclick="genPickImg()" title="Grafika poglądowa szafki – widoczna w projekcie">🖼 Grafika</button>
+            <button class="btn btn-sec" id="gen-img-del" onclick="genDelImg()" style="display:none" title="Usuń grafikę">✕</button>
+          </div>
         </div>
         <p class="gen-note">Wzory wymiarów: <b>H</b>=wysokość, <b>W</b>=szerokość, <b>D</b>=głębokość, <b>T</b>=grubość płyty + parametry własne poniżej (litera zmiennej przydzielana automatycznie). Dozwolone + − * / ( ), np. <b>W-2*T</b>. Ilość też może być wzorem. Parametr typu <b>lista</b> to lista rozwijana – wybrana opcja daje wartość liczbową równą pozycji na liście (0, 1, 2…). Przy generowaniu w szablonie TCN podmieniane są wymiary (::UNm DL/DH/DS) oraz zmienne <b>r</b> z sekcji VAR – przycisk <b>r</b> przy szablonie pozwala przypisać im wzory szafki (np. r1=<b>N</b>); brak szablonu = pusty plik TCN. Zmiany zapisują się automatycznie.</p>
         <div style="margin-bottom:var(--s4)">
@@ -332,29 +367,6 @@ main{display:flex;overflow:hidden}
         </div>
         <button class="btn btn-sec" onclick="genDefAddEl()" style="margin-top:var(--s3)">+ Dodaj element</button>
       </div>
-      <div class="box" id="gen-dims-box">
-        <h3>Wymiary i generowanie</h3>
-        <div class="gen-grid" id="gen-dims-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,190px))"></div>
-        <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:center;flex-wrap:wrap">
-          <button class="btn btn-p" onclick="genBuildList()">Generuj listę formatek</button>
-          <span class="gen-note" style="margin:0">Parametry dodasz i usuniesz w trybie „Edytuj szafki”.</span>
-        </div>
-      </div>
-      <div class="box" id="gen-list-box" style="display:none">
-        <h3>Formatki</h3>
-        <div class="gen-table-wrap">
-        <table class="gen-table">
-          <thead><tr><th>Kolor płyty</th><th>Słoje</th><th>Długość</th><th>Szerokość</th><th>Ilość</th><th>Nazwa</th><th>Kod szafki</th><th>Opis</th><th>Dł. front</th><th>Dł. tył</th><th>Szer. lewa</th><th>Szer. prawa</th><th>Plik</th><th>Kod kreskowy</th><th></th></tr></thead>
-          <tbody id="gen-tbody"></tbody>
-        </table>
-        </div>
-        <div style="display:flex;gap:var(--s2);margin-top:var(--s3);align-items:center;flex-wrap:wrap">
-          <button class="btn btn-sec" onclick="genAddRow()">+ Formatka</button>
-          <span class="fbr-status" id="gen-outdir-status">Pliki TCN trafią do katalogu z paska plików</span>
-          <button class="btn btn-p" onclick="genWriteFiles()" style="margin-left:auto">Generuj pliki</button>
-          <button class="btn btn-sec" id="gen-print-btn" onclick="genPrint()" disabled>🖨 Drukuj kody</button>
-        </div>
-      </div>
     </div>
   </div>
 </main>
@@ -367,7 +379,7 @@ main{display:flex;overflow:hidden}
     <div class="modal-body">
       <div class="modal-section">
         <h3>💾 Katalog ustawień (synchronizacja / git)</h3>
-        <p>Podstawowa lokalizacja to <b>katalog pliku HTML aplikacji</b> – leżący obok <b>ustawienia.json</b> (+ <b>szablony/</b>) wczytuje się automatycznie przy starcie. Aby zmiany zapisywały się automatycznie (albo żeby użyć innej lokalizacji), wskaż katalog przyciskiem – przeglądarka wymaga jednorazowego wyboru. Całość ustawień (szafki, parametry, narzędzia frezów/piłek, skaner) zapisuje się wtedy przy każdej zmianie i można ją przenosić gitem między komputerami.</p>
+        <p>Podstawowa lokalizacja to <b>katalog pliku HTML aplikacji</b> – leżący obok <b>ustawienia.json</b> (+ <b>szablony/</b>) wczytuje się automatycznie przy starcie. Aby zmiany zapisywały się automatycznie (albo żeby użyć innej lokalizacji), wskaż katalog przyciskiem – przeglądarka wymaga jednorazowego wyboru. Całość ustawień (szafki, projekty, parametry, narzędzia frezów/piłek, skaner) trzymana jest na bieżąco w przeglądarce, a do pliku zapisuje się przy przełączeniu karty/okna oraz przyciskiem „Zapisz teraz” – dzięki temu zapis pliku nie przeładowuje strony podglądu (Live Server). Plik można przenosić gitem między komputerami.</p>
         <div style="display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap">
           <button class="btn btn-sec" onclick="genPickCfgDir()" style="font-size:var(--txs);padding:5px 8px">📁 Wybierz katalog</button>
           <span class="fbr-status" id="gen-cfgdir-status">Brak katalogu</span>
@@ -2519,7 +2531,9 @@ async function brPickDir(){
 
 async function brLoadDir(){
   if(!brDirHandle)return;
-  document.getElementById('fbr-status').textContent='Ładowanie…';
+  // "Ładowanie…" tylko przy pierwszym wczytaniu – odświeżenia z watchera
+  // nie mają mrugać statusem
+  if(!brAllFiles.length)document.getElementById('fbr-status').textContent='Ładowanie…';
   const files=[];
   try{
     for await(const [name,fh] of brDirHandle.entries()){
@@ -3316,9 +3330,13 @@ function drawCode39(cv,txt){
 let genRows=[];       // formatki: [{id,name,qty,dl,dh,ds,kolor,sloje,opis,edgeF,edgeB,edgeL,edgeR,cabCode,tpl,fileName}]
 let genRowId=1;
 let genCfgDir=null;   // katalog ustawień (eksport/import przez git)
-let genCabinets=[];   // definicje szafek: [{id,name,code,els:[{name,qty,dl,dh,ds,kolor,sloje,opis,edgeF,edgeB,edgeL,edgeR,tpl,tplName}]}] wzory jako tekst
+let genCabinets=[];   // definicje szafek: [{id,name,code,img,els:[{name,qty,dl,dh,ds,kolor,sloje,opis,edgeF,edgeB,edgeL,edgeR,tpl,tplName,rvars}]}] wzory jako tekst
 let genCabSel=0;      // indeks wybranej szafki
-let genOpts={base:16};// system liczbowy kodów plików (16 lub 10)
+let genProjects=[];   // projekty (np. klienci): [{id,name,prefix,cabs:[{id,cabId,no,vals:{H:…,N:…}}]}]
+let genProjSel=0;     // indeks wybranego projektu
+let genProjCabId=1;   // kolejny id szafki w projekcie
+let genPinOk=false;   // PIN konstruktora podany poprawnie w tej sesji
+let genOpts={base:16,pin:'0000'};// system kodów plików (16/10) + PIN konstruktora (w ustawienia.json)
 const GEN_CODE_MAX=10;// maks. długość kodu (cyfr)
 const GEN_CFG_FILE='ustawienia.json';
 const GEN_CFG_FILE_OLD='szafki.json'; // odczyt starszego eksportu
@@ -3345,11 +3363,52 @@ function genElNorm(el){
 /* Uzupełnia brakujące pola szafki; migracja: stare szafki dostają parametr N (ilość półek) */
 function genCabNorm(c){
   if(!c.code)c.code=c.code||'';
+  if(typeof c.img!=='string')c.img='';
   if(!Array.isArray(c.params))c.params=[{key:'N',label:'Ilość półek',def:1}];
   if(!c.base||typeof c.base!=='object')c.base={};
   GEN_BASE_DEFS.forEach(bd=>{if(!(+c.base[bd.key]>0))c.base[bd.key]=bd.def;});
   c.els=(c.els||[]).map(genElNorm);
   return c;
+}
+/* Losowy 2-literowy prefiks kodu projektu – stały w projekcie, inny dla kolejnych */
+function genRandPrefix(){
+  const used=new Set(genProjects.map(p=>p.prefix).filter(Boolean));
+  const L='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for(let t=0;t<300;t++){
+    const pf=L[Math.floor(Math.random()*26)]+L[Math.floor(Math.random()*26)];
+    if(!used.has(pf))return pf;
+  }
+  return 'XX';
+}
+/* Projekt = zamówienie/klient: lista szafek (typ + wartości parametrów).
+   Kod szafki = prefiks projektu + kolejny numer (KT1, KT2, …) */
+function genProjNorm(p){
+  if(!p.name)p.name='Projekt';
+  if(!p.prefix||!/^[A-Z]{2}$/.test(p.prefix))p.prefix=genRandPrefix();
+  if(!Array.isArray(p.cabs))p.cabs=[];
+  let maxNo=0;
+  p.cabs.forEach(pc=>{
+    if(pc.id==null)pc.id=genProjCabId++;
+    if(genProjCabId<=pc.id)genProjCabId=pc.id+1;
+    if(!pc.vals||typeof pc.vals!=='object')pc.vals={};
+    if(pc.no>0)maxNo=Math.max(maxNo,pc.no);
+  });
+  p.cabs.forEach(pc=>{if(!(pc.no>0))pc.no=++maxNo;});
+  // Formatki projektu – trwałe (przetrwają zmianę projektu i restart)
+  if(!Array.isArray(p.rows))p.rows=[];
+  p.rows.forEach(r=>{if(r.id!=null&&genRowId<=r.id)genRowId=r.id+1;});
+  return p;
+}
+/* Podpina genRows pod formatki bieżącego projektu */
+function genBindRows(){
+  const p=genProj();
+  genRows=p?(p.rows=Array.isArray(p.rows)?p.rows:[]):[];
+}
+function genProjCabCode(p,pc){return (p?.prefix||'')+(pc?.no||'');}
+function genProj(){const p=genProjects[genProjSel];return p?genProjNorm(p):null;}
+/* Definicja szafki wskazywana przez wpis projektu (po id, z fallbackiem) */
+function genCabById(cabId){
+  return genCabinets.find(c=>c.id===cabId)||genCabinets[0]||null;
 }
 function genDefaultCabinet(){
   const e=(name,qty,dl)=>genElNorm({name,qty,dl});
@@ -3364,31 +3423,159 @@ function genDefaultCabinet(){
 function genCab(){const c=genCabinets[genCabSel];return c?genCabNorm(c):null;}
 
 /* ── Parametry (podstawowe H/W/D/T + własne) ────────────────────── */
-/* Pola wartości w "Wymiary i generowanie" – tylko wpisywanie, bez edycji listy */
-function genRenderParams(){
-  const grid=document.getElementById('gen-dims-grid');
-  if(!grid)return;
-  grid.innerHTML='';
-  const c=genCab();if(!c)return;
-  const add=(label,key,inner)=>{
-    const d=document.createElement('div');
-    d.className='dimf gen-param';
-    d.innerHTML=`<label>${escA(label)} <b style="color:var(--pri)">${escA(key)}</b></label>`+inner;
-    grid.appendChild(d);
-  };
-  GEN_BASE_DEFS.forEach(bd=>add(bd.label,bd.key,
-    `<input type="number" id="gen-par-${escA(bd.key)}" value="${+c.base[bd.key]||bd.def}" step="any" onchange="genBaseDef('${bd.key}',this.value)">`));
-  c.params.forEach((p,i)=>{
+/* Projekty: lista projektów + szafki wybranego projektu – tryb "Generuj szafki" */
+function genRenderProjSel(){
+  const list=document.getElementById('gen-proj-list');
+  if(!list)return;
+  if(!genProjects.length){
+    list.innerHTML='<span class="gen-note">Brak projektów – utwórz pierwszy przyciskiem „＋ Nowy projekt”.</span>';
+  }else{
+    list.innerHTML=genProjects.map((p,i)=>{
+      const sel=i===genProjSel;
+      return `<div onclick="genSelProj(${i})" style="display:flex;gap:var(--s2);align-items:center;padding:var(--s2) var(--s3);border:1px solid ${sel?'var(--pri)':'var(--bord)'};border-radius:8px;cursor:pointer;background:${sel?'color-mix(in oklab,var(--pri) 12%,var(--surf2))':'var(--surf2)'}">
+        <b>${escA(p.name)}</b>
+        <span class="otb" title="Prefiks kodów szafek tego projektu">${escA(p.prefix||'')}</span>
+        <span style="font-size:var(--txs);color:var(--faint)" data-proj-count="${i}">${(p.cabs||[]).length} szafek</span>
+        <span style="margin-left:auto;display:flex;gap:4px">
+          <button class="btn btn-sec" style="font-size:var(--txs);padding:2px 8px" onclick="event.stopPropagation();genRenameProj(${i})" title="Zmień nazwę">✎</button>
+          <button class="btn-del" onclick="event.stopPropagation();genDelProj(${i})" title="Usuń projekt">✕</button>
+        </span>
+      </div>`;
+    }).join('');
+  }
+  genRenderProjCabs();
+}
+function genRenderProjCabs(){
+  const box=document.getElementById('gen-proj-cabs');
+  if(!box)return;
+  const open=document.getElementById('gen-proj-open');
+  const proj=genProj();
+  if(open)open.style.display=proj?'':'none';
+  if(!proj){box.innerHTML='';return;}
+  const title=document.getElementById('gen-proj-title');
+  if(title)title.textContent=`Szafki projektu „${proj.name}” (kody: ${proj.prefix}1, ${proj.prefix}2, …)`;
+  if(!proj.cabs.length){box.innerHTML='<span class="gen-note">Projekt jest pusty – dodaj pierwszą szafkę.</span>';return;}
+  box.innerHTML=proj.cabs.map(pc=>genProjCabCard(proj,pc)).join('');
+}
+/* HTML jednej karty szafki w projekcie – używane też do doklejania nowej
+   karty bez przebudowy pozostałych (mniej migotania obrazków) */
+function genProjCabCard(proj,pc){
+  const cab=genCabById(pc.cabId);
+  if(!cab)return '';
+  const typeSel=`<select class="gen-sel" style="min-width:180px" onchange="genProjSetType(${pc.id},+this.value)">`+
+    genCabinets.map((c,i)=>`<option value="${i}"${c.id===cab.id?' selected':''}>${escA(c.name)}</option>`).join('')+'</select>';
+  const par=(label,key,inner)=>`<div class="dimf gen-param" style="min-width:110px;max-width:150px"><label>${escA(label)} <b style="color:var(--pri)">${escA(key)}</b></label>${inner}</div>`;
+  const fields=GEN_BASE_DEFS.map(bd=>{
+    const v=(pc.vals[bd.key]!=null&&pc.vals[bd.key]!=='')?+pc.vals[bd.key]:(+cab.base[bd.key]||bd.def);
+    return par(bd.label,bd.key,`<input type="number" step="any" value="${v}" onchange="genProjVal(${pc.id},'${bd.key}',this.value)">`);
+  }).join('')+(cab.params||[]).map(p=>{
     if(p.type==='list'&&Array.isArray(p.options)&&p.options.length){
-      // lista: wybrana opcja daje wartość liczbową = pozycja na liście (0,1,2…)
-      const def=Math.min(Math.max(0,Math.round(+p.def||0)),p.options.length-1);
-      add(p.label,p.key,`<select id="gen-par-${escA(p.key)}" class="gen-sel" onchange="genParamDef(${i},this.value)">`+
-        p.options.map((o,k)=>`<option value="${k}"${k===def?' selected':''}>${escA(o)}</option>`).join('')+'</select>');
-    } else {
-      add(p.label,p.key,`<input type="number" id="gen-par-${escA(p.key)}" value="${+p.def||0}" step="any" onchange="genParamDef(${i},this.value)">`);
+      const cur=Math.min(Math.max(0,Math.round(pc.vals[p.key]!=null?+pc.vals[p.key]:(+p.def||0))),p.options.length-1);
+      return par(p.label,p.key,`<select class="gen-sel" onchange="genProjVal(${pc.id},'${p.key}',this.value)">`+
+        p.options.map((o,k)=>`<option value="${k}"${k===cur?' selected':''}>${escA(o)}</option>`).join('')+'</select>');
     }
+    const v=(pc.vals[p.key]!=null&&pc.vals[p.key]!=='')?+pc.vals[p.key]:(+p.def||0);
+    return par(p.label,p.key,`<input type="number" step="any" value="${v}" onchange="genProjVal(${pc.id},'${p.key}',this.value)">`);
+  }).join('');
+  return `<div id="gen-projcab-${pc.id}" style="display:flex;gap:var(--s3);align-items:flex-start;padding:var(--s3);border:1px solid var(--bord);border-radius:8px;margin-bottom:var(--s2);background:var(--surf2)">
+    <div style="display:grid;gap:4px;justify-items:center">
+      ${cab.img?`<img src="${cab.img}" alt="" decoding="sync" style="width:110px;height:84px;object-fit:contain;border:1px solid var(--bord);border-radius:6px;background:var(--surf)">`:`<div style="width:110px;height:84px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--bord);border-radius:6px;color:var(--faint);font-size:var(--txs)">brak grafiki</div>`}
+      <span style="font-size:var(--txs)"><b style="color:var(--pri)">${escA(genProjCabCode(proj,pc))}</b></span>
+    </div>
+    <div style="flex:1">
+      <div style="display:flex;gap:var(--s2);align-items:center;margin-bottom:var(--s2)">${typeSel}
+        <button class="btn-del" style="margin-left:auto" title="Usuń szafkę z projektu" onclick="genProjDelCab(${pc.id})">✕</button>
+      </div>
+      <div style="display:flex;gap:var(--s2);flex-wrap:wrap">${fields}</div>
+    </div>
+  </div>`;
+}
+function genAddProj(){
+  const name=prompt('Nazwa projektu (np. Nowak – kuchnia):','');
+  if(name===null||!name.trim())return;
+  genProjects.push(genProjNorm({id:Date.now(),name:name.trim(),cabs:[]}));
+  genProjSel=genProjects.length-1;
+  genBindRows();genRenderRows();
+  genRenderProjSel();
+  IDB.set('genProjSel',genProjSel).catch(()=>{});
+  genPersist();
+}
+function genRenameProj(i){
+  const p=genProjects[i];if(!p)return;
+  const name=prompt('Nowa nazwa projektu:',p.name);
+  if(name===null||!name.trim())return;
+  p.name=name.trim();
+  genRenderProjSel();
+  genPersist();
+}
+function genDelProj(i){
+  const p=genProjects[i];if(!p)return;
+  if(!confirm(`Usunąć projekt „${p.name}” wraz z listą szafek i formatek?`))return;
+  genProjects.splice(i,1);
+  genProjSel=Math.min(genProjSel,Math.max(0,genProjects.length-1));
+  genBindRows();genRenderRows();
+  genRenderProjSel();
+  genPersist();
+}
+function genSelProj(i){
+  genProjSel=Math.max(0,Math.min(genProjects.length-1,i));
+  genBindRows();genRenderRows();
+  genRenderProjSel();
+  IDB.set('genProjSel',genProjSel).catch(()=>{});
+}
+function genProjAddCab(){
+  let p=genProj();
+  if(!p){
+    genProjects.push(genProjNorm({id:Date.now(),name:'Projekt 1',cabs:[]}));
+    genProjSel=0;p=genProj();
+    genRenderProjSel();
+  }
+  const cab=genCabinets[0];if(!cab){showToast('Najpierw zdefiniuj szafkę w „Konstruktorze szafek”',true);return;}
+  const no=p.cabs.reduce((m,pc)=>Math.max(m,pc.no||0),0)+1;
+  const pc={id:genProjCabId++,cabId:cab.id,no,vals:{}};
+  p.cabs.push(pc);
+  // doklej tylko nową kartę – bez przebudowy pozostałych (obrazki nie migają)
+  const box=document.getElementById('gen-proj-cabs');
+  if(box&&p.cabs.length>1)box.insertAdjacentHTML('beforeend',genProjCabCard(p,pc));
+  else genRenderProjCabs();
+  genProjListCounts();
+  genPersist();
+}
+function genProjDelCab(id){
+  const p=genProj();if(!p)return;
+  p.cabs=p.cabs.filter(pc=>pc.id!==id);
+  // usuń tylko kartę tej szafki
+  const card=document.getElementById('gen-projcab-'+id);
+  if(card)card.remove();else genRenderProjCabs();
+  if(!p.cabs.length)genRenderProjCabs();
+  genProjListCounts();
+  genPersist();
+}
+/* Aktualizuje liczniki szafek na liście projektów bez przebudowy listy */
+function genProjListCounts(){
+  const list=document.getElementById('gen-proj-list');
+  if(!list)return;
+  const spans=list.querySelectorAll('[data-proj-count]');
+  spans.forEach(s=>{
+    const i=+s.dataset.projCount;
+    if(genProjects[i])s.textContent=(genProjects[i].cabs||[]).length+' szafek';
   });
 }
+function genProjSetType(id,cabIdx){
+  const p=genProj();const pc=p?.cabs.find(pc=>pc.id===id);if(!pc)return;
+  const cab=genCabinets[cabIdx];if(!cab)return;
+  pc.cabId=cab.id;
+  pc.vals={}; // inny typ = inne parametry, wartości od nowa (domyślne)
+  genRenderProjCabs();
+  genPersist();
+}
+function genProjVal(id,key,val){
+  const p=genProj();const pc=p?.cabs.find(pc=>pc.id===id);if(!pc)return;
+  pc.vals[key]=val;
+  genPersist();
+}
+/* Zmiana definicji parametrów odświeża karty szafek w projekcie */
+function genRenderParams(){genRenderProjCabs();}
 /* Edytor parametrów w "Ustawieniach szafki" – podstawowe (nieusuwalne) + własne.
    Parametr własny może być liczbą albo listą opcji: wybrana opcja daje
    wartość liczbową równą jej pozycji na liście (0, 1, 2, …). */
@@ -3520,47 +3707,63 @@ function genEval(expr,vars){
   }catch(_){return null;}
 }
 
-function genBuildList(){
-  const cab=genCab();
-  if(!cab||!cab.els.length){showToast('Brak definicji szafki – dodaj elementy w trybie „Edytuj szafki”',true);return;}
-  const vars={};
-  GEN_BASE_DEFS.forEach(bd=>{
-    const v=parseFloat(document.getElementById('gen-par-'+bd.key)?.value);
-    vars[bd.key]=isNaN(v)?(+cab.base[bd.key]||bd.def):v;
-    cab.base[bd.key]=vars[bd.key]; // zapamiętaj ostatnio użytą wartość
-  });
-  if(vars.H<=0||vars.W<=0||vars.D<=0){showToast('Podaj poprawne wymiary szafki',true);return;}
-  if(!(vars.T>0))vars.T=18;
-  const T=vars.T;
-  cab.params.forEach(p=>{
-    const inp=document.getElementById('gen-par-'+p.key);
-    const v=parseFloat(inp?.value);
-    vars[p.key]=isNaN(v)?(+p.def||0):v;
-    p.def=vars[p.key]; // zapamiętaj ostatnio użytą wartość
-  });
-  genPersist();
-  genRows=[];
+/* Buduje listę formatek dla WSZYSTKICH szafek bieżącego projektu.
+   Lista jest trwała (zapisana w projekcie) – ponowne budowanie zastępuje ją,
+   więc przy istniejących plikach pytamy o potwierdzenie. */
+async function genBuildList(){
+  const proj=genProj();
+  if(!proj){showToast('Najpierw utwórz projekt',true);return;}
+  if(!proj.cabs.length&&!genRows.length){showToast('Dodaj szafki do projektu',true);return;}
+  // Lista już istnieje: OK = przebudowa z szafek (nowe wiersze i kody),
+  // Anuluj = zostaw listę (z ręcznymi poprawkami) i tylko zapisz pliki
+  if(genRows.length&&
+     !confirm('Projekt ma już listę formatek.\n\nOK – przebuduj listę z szafek projektu (wiersze i kody od nowa)\nAnuluj – zachowaj obecną listę i tylko zapisz pliki (nowe / zmienione ↻)')){
+    await genWriteFiles();
+    return;
+  }
+  genRows=proj.rows=[];
   const bad=[];
-  cab.els.forEach(raw=>{
-    const el=genElNorm(raw);
-    const q=Math.max(0,Math.round(genEval(el.qty,vars)??1));
-    const dl=genEval(el.dl,vars),dh=genEval(el.dh,vars),ds=genEval(el.ds,vars)??T;
-    if(dl===null||dh===null||dl<=0||dh<=0){if(q>0)bad.push(el.name);return;}
-    if(q<1)return;
-    // zmienne r szablonu: wylicz wzory (np. r1=N) → wartości do VAR pliku
-    const rvals={};
-    Object.entries(el.rvars||{}).forEach(([idx,expr])=>{
-      const v=genEval(expr,vars);
-      if(v===null)bad.push(el.name+' (r'+idx+'='+expr+')');else rvals[idx]=v;
+  proj.cabs.forEach((pc,ci)=>{
+    const cab=genCabById(pc.cabId);
+    const code=genProjCabCode(proj,pc); // np. KT1 – stały prefiks projektu + numer szafki
+    if(!cab||!cab.els.length){bad.push('szafka '+code+' (brak definicji)');return;}
+    const tag=cab.name+' '+code;
+    const vars={};
+    GEN_BASE_DEFS.forEach(bd=>{
+      const v=parseFloat(pc.vals[bd.key]);
+      vars[bd.key]=isNaN(v)?(+cab.base[bd.key]||bd.def):v;
     });
-    genRows.push({id:genRowId++,name:el.name,qty:q,dl,dh,ds,
-      kolor:el.kolor,sloje:el.sloje||'tak',opis:el.opis,
-      edgeF:el.edgeF,edgeB:el.edgeB,edgeL:el.edgeL,edgeR:el.edgeR,
-      cabCode:cab.code||'',tpl:el.tpl||null,tplName:el.tplName||el.tpl?.name||null,
-      rvals:Object.keys(rvals).length?rvals:null,fileName:null});
+    if(vars.H<=0||vars.W<=0||vars.D<=0){bad.push(tag+' (złe wymiary)');return;}
+    if(!(vars.T>0))vars.T=18;
+    const T=vars.T;
+    (cab.params||[]).forEach(p=>{
+      const v=parseFloat(pc.vals[p.key]);
+      vars[p.key]=isNaN(v)?(+p.def||0):v;
+    });
+    cab.els.forEach(raw=>{
+      const el=genElNorm(raw);
+      const q=Math.max(0,Math.round(genEval(el.qty,vars)??1));
+      const dl=genEval(el.dl,vars),dh=genEval(el.dh,vars),ds=genEval(el.ds,vars)??T;
+      if(dl===null||dh===null||dl<=0||dh<=0){if(q>0)bad.push(tag+': '+el.name);return;}
+      if(q<1)return;
+      // zmienne r szablonu: wylicz wzory (np. r1=N) → wartości do VAR pliku
+      const rvals={};
+      Object.entries(el.rvars||{}).forEach(([idx,expr])=>{
+        const v=genEval(expr,vars);
+        if(v===null)bad.push(tag+': '+el.name+' (r'+idx+'='+expr+')');else rvals[idx]=v;
+      });
+      genRows.push({id:genRowId++,name:el.name,qty:q,dl,dh,ds,
+        kolor:el.kolor,sloje:el.sloje||'tak',opis:el.opis,
+        edgeF:el.edgeF,edgeB:el.edgeB,edgeL:el.edgeL,edgeR:el.edgeR,
+        cabCode:code,tpl:el.tpl||null,tplName:el.tplName||el.tpl?.name||null,
+        rvals:Object.keys(rvals).length?rvals:null,fileName:null});
+    });
   });
   if(bad.length)showToast('Błędny wzór lub wymiar ≤0: '+bad.join(', '),true);
   genRenderRows();
+  genPersist();
+  // Od razu generuj pliki TCN i kody – lista i pliki jednym kliknięciem
+  if(genRows.length)await genWriteFiles();
 }
 
 function genRenderRows(){
@@ -3579,7 +3782,7 @@ function genRenderRows(){
     ${txt(r,'edgeB',60)}
     ${txt(r,'edgeL',60)}
     ${txt(r,'edgeR',60)}
-    <td style="white-space:nowrap;color:${r.fileName?'var(--ok)':'var(--faint)'}">${r.fileName||'—'}</td>
+    <td style="white-space:nowrap;color:${r.fileName?(r.dirty?'#f59e0b':'var(--ok)'):'var(--faint)'}" title="${r.dirty?'Wymiary zmienione – „Generuj pliki” nadpisze ten plik':''}">${r.fileName?(r.fileName+(r.dirty?' ↻':'')):((r.tpl||r.tplName)?'—':'bez TCN')}</td>
     <td>${r.fileName?`<canvas id="gen-bc-${r.id}" width="200" height="50" style="background:#fff;border-radius:3px;display:block"></canvas>`:'<span style="color:var(--faint)">—</span>'}</td>
     <td class="td-del"><button class="btn-del" onclick="genDelRow(${r.id})">✕</button></td>
   </tr>`).join('');
@@ -3596,39 +3799,65 @@ function genRenderRows(){
 
 function genUpd(id,field,val){
   const r=genRows.find(r=>r.id===id);if(!r)return;
-  if(field==='qty'){r.qty=Math.max(1,Math.round(parseFloat(val))||1);return;}
+  if(field==='qty'){r.qty=Math.max(1,Math.round(parseFloat(val))||1);genPersist();return;}
   if(['dl','dh','ds'].includes(field)){
     const v=parseFloat(val);if(isNaN(v))return;
     r[field]=v;
-    // zmiana wymiarów unieważnia już wygenerowany plik
-    if(r.fileName){r.fileName=null;genRenderRows();}
+    // zmiana wymiarów NIE zmienia kodu pliku – plik zostanie nadpisany
+    // przy następnym „Generuj pliki” (ta sama nazwa, nowa zawartość)
+    if(r.fileName&&!r.dirty){r.dirty=true;genRenderRows();}
+    genPersist();
     return;
   }
   r[field]=val; // pola tekstowe: name, kolor, sloje, opis, cabCode, edge*
+  genPersist();
 }
-function genDelRow(id){genRows=genRows.filter(r=>r.id!==id);genRenderRows();}
-function genAddRow(){
-  const D=parseFloat(document.getElementById('gen-par-D')?.value)||500;
-  const T=parseFloat(document.getElementById('gen-par-T')?.value)||18;
-  genRows.push({id:genRowId++,name:'Element',qty:1,dl:400,dh:D,ds:T,
-    kolor:'',sloje:'tak',opis:'',edgeF:'',edgeB:'',edgeL:'',edgeR:'',
-    cabCode:genCab()?.code||'',tpl:null,fileName:null});
+function genDelRow(id){
+  genRows=genRows.filter(r=>r.id!==id);
+  const p=genProj();if(p)p.rows=genRows;
   genRenderRows();
+  genPersist();
+}
+function genAddRow(){
+  const p=genProj();if(!p)return;
+  genRows.push({id:genRowId++,name:'Element',qty:1,dl:400,dh:500,ds:18,
+    kolor:'',sloje:'tak',opis:'',edgeF:'',edgeB:'',edgeL:'',edgeR:'',
+    cabCode:p.prefix||'',tpl:null,fileName:null});
+  genRenderRows();
+  genPersist();
 }
 
 /* ── Ustawienia szafek: definicje, wzory, szablony ──────────────── */
 let genPersistTimer=null;
-/* Autozapis definicji do IDB (debounce) + auto-eksport do katalogu ustawień */
+let genTplCopyPending=true; // skopiuj szablony do szablony/ przy najbliższym eksporcie
+let genCfgExportPending=false; // są zmiany nie zapisane jeszcze do ustawienia.json
+/* Autozapis definicji do IDB (debounce). Eksport do ustawienia.json NIE dzieje
+   się tutaj – zapis pliku w katalogu projektu potrafi wywołać przeładowanie
+   strony (Live Server/Preview obserwuje katalog). Plik zapisujemy dopiero przy
+   ukryciu karty / zamknięciu (genExportOnHide) albo ręcznie („Zapisz teraz”). */
 function genPersist(){
+  genCfgExportPending=true;
   clearTimeout(genPersistTimer);
-  genPersistTimer=setTimeout(async()=>{
-    try{
-      await IDB.set('genCabinets',genCabinets); // uchwyty plików zapisują się razem z definicją
-      await IDB.set('genOpts',genOpts);
-    }catch(e){console.warn('genPersist:',e);showToast('Błąd zapisu ustawień szafek',true);}
-    genExportCfg(false); // cichy autozapis do katalogu ustawień (jeśli podpięty)
-  },400);
+  genPersistTimer=setTimeout(()=>{genPersistNow();},400);
 }
+/* Natychmiastowy zapis stanu do IDB – używany też po wygenerowaniu plików,
+   żeby przypadkowe przeładowanie strony nie zgubiło kodów formatek */
+async function genPersistNow(){
+  clearTimeout(genPersistTimer);
+  try{
+    await IDB.set('genCabinets',genCabinets); // uchwyty plików zapisują się razem z definicją
+    await IDB.set('genOpts',genOpts);
+    await IDB.set('genProjects',genProjects);
+  }catch(e){console.warn('genPersist:',e);showToast('Błąd zapisu ustawień szafek',true);}
+}
+/* Eksport pliku ustawień, gdy użytkownik odchodzi z karty – reload wywołany
+   przez watcher serwera trafia wtedy w moment, gdy strona i tak jest ukryta */
+function genExportOnHide(){
+  if(!genCfgExportPending||!genCfgDir)return;
+  genExportCfg(false);
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)genExportOnHide();});
+window.addEventListener('pagehide',genExportOnHide);
 
 /* ── Katalog ustawień: eksport/import przez git ─────────────────── */
 async function genCfgPerm(mode,queryOnly){
@@ -3662,18 +3891,32 @@ async function genPickCfgDir(){
   }catch(e){if(e.name!=='AbortError')console.error(e);}
 }
 /* Zbiera CAŁOŚĆ ustawień do JSON (uchwyty plików → nazwy w szablony/) */
+let genCfgLastExportIso=''; // znacznik czasu ostatniego eksportu (ochrona przed starym plikiem)
 function genCfgSerialize(){
+  genCfgLastExportIso=new Date().toISOString();
   return JSON.stringify({
     version:2,
-    exported:new Date().toISOString(),
+    exported:genCfgLastExportIso,
     opts:genOpts,
     toolSettings:{
       millTools:toolSettings.millTools,
       sawTools:toolSettings.sawTools,
       scannerGap:toolSettings.scannerGap||80,
     },
+    projects:genProjects.map(genProjNorm).map(p=>({
+      id:p.id,name:p.name,prefix:p.prefix,
+      cabs:p.cabs.map(pc=>({id:pc.id,cabId:pc.cabId,no:pc.no,vals:pc.vals})),
+      rows:(p.rows||[]).map(r=>({
+        id:r.id,name:r.name,qty:r.qty,dl:r.dl,dh:r.dh,ds:r.ds,
+        kolor:r.kolor,sloje:r.sloje,opis:r.opis,
+        edgeF:r.edgeF,edgeB:r.edgeB,edgeL:r.edgeL,edgeR:r.edgeR,
+        cabCode:r.cabCode,tplName:r.tplName||r.tpl?.name||null,
+        rvals:r.rvals||undefined,fileName:r.fileName||null,
+        dirty:r.dirty||undefined,
+      })),
+    })),
     cabinets:genCabinets.map(genCabNorm).map(c=>({
-      id:c.id,name:c.name,code:c.code||'',
+      id:c.id,name:c.name,code:c.code||'',img:c.img||undefined,
       base:c.base,
       params:(c.params||[]).map(p=>({key:p.key,label:p.label,def:p.def,
         type:p.type||'num',options:Array.isArray(p.options)?p.options:undefined})),
@@ -3687,11 +3930,14 @@ function genCfgSerialize(){
     })),
   },null,2);
 }
-/* Zapis szafki.json + kopie szablonów TCN do szablony/. verbose=true → toasty */
+/* Zapis szafki.json + kopie szablonów TCN do szablony/. verbose=true → toasty.
+   Cichy autozapis (verbose=false) NIGDY nie prosi o uprawnienia – dymek
+   uprawnień wyskakujący przy każdej zmianie wyglądał jak miganie ekranu.
+   O zgodę pytamy tylko przy ręcznym „Zapisz teraz” / wyborze katalogu. */
 async function genExportCfg(verbose){
   if(!genCfgDir){if(verbose)showToast('Najpierw wybierz katalog ustawień',true);return;}
-  if(!await genCfgPerm('readwrite')){
-    genCfgStatus(genCfgDir.name+' (brak zezwolenia)');
+  if(!await genCfgPerm('readwrite',!verbose)){
+    genCfgStatus(genCfgDir.name+(verbose?' (brak zezwolenia)':' (kliknij „Zapisz teraz”)'));
     if(verbose)showToast('Brak uprawnień zapisu do katalogu ustawień',true);
     return;
   }
@@ -3699,22 +3945,29 @@ async function genExportCfg(verbose){
     const fh=await genCfgDir.getFileHandle(GEN_CFG_FILE,{create:true});
     const w=await fh.createWritable();
     await w.write(genCfgSerialize());await w.close();
-    // Kopie szablonów – dzięki temu git przenosi też pliki TCN
-    const tplDir=await genCfgDir.getDirectoryHandle(GEN_CFG_TPLDIR,{create:true});
-    const done=new Set();
-    for(const c of genCabinets)for(const raw of (c.els||[])){
-      const el=genElNorm(raw);
-      if(!el.tpl||done.has(el.tplName||el.tpl.name))continue;
-      try{
-        const name=el.tplName||el.tpl.name;
-        // kopia bajt w bajt – szablony UTF-16 z TpaCAD nie mogą przejść przez .text()
-        const buf=await (await el.tpl.getFile()).arrayBuffer();
-        const tfh=await tplDir.getFileHandle(name,{create:true});
-        const tw=await tfh.createWritable();
-        await tw.write(buf);await tw.close();
-        done.add(name);
-      }catch(e){console.warn('kopia szablonu:',e);}
+    // Kopie szablonów – dzięki temu git przenosi też pliki TCN.
+    // Tylko gdy szablony się zmieniły (albo ręczny eksport) – kopiowanie
+    // wszystkiego przy każdym autozapisie powodowało zbędne I/O i migotanie.
+    if(genTplCopyPending||verbose){
+      const tplDir=await genCfgDir.getDirectoryHandle(GEN_CFG_TPLDIR,{create:true});
+      const done=new Set();
+      for(const c of genCabinets)for(const raw of (c.els||[])){
+        const el=genElNorm(raw);
+        if(!el.tpl||done.has(el.tplName||el.tpl.name))continue;
+        try{
+          const name=el.tplName||el.tpl.name;
+          // kopia bajt w bajt – szablony UTF-16 z TpaCAD nie mogą przejść przez .text()
+          const buf=await (await el.tpl.getFile()).arrayBuffer();
+          const tfh=await tplDir.getFileHandle(name,{create:true});
+          const tw=await tfh.createWritable();
+          await tw.write(buf);await tw.close();
+          done.add(name);
+        }catch(e){console.warn('kopia szablonu:',e);}
+      }
+      genTplCopyPending=false;
     }
+    genCfgExportPending=false;
+    await IDB.set('genCfgExportedAt',genCfgLastExportIso).catch(()=>{});
     genCfgStatus(genCfgDir.name+' ✓');
     if(verbose)showToast('✓ Wyeksportowano ustawienia do „'+genCfgDir.name+'”');
   }catch(e){
@@ -3738,10 +3991,21 @@ async function genApplyCfg(cfg,resolveTpl){
       }
       els.push(el);
     }
-    cabs.push(genCabNorm({id:c.id||Date.now()+cabs.length,name:c.name||'Szafka',code:c.code||'',base:c.base,params:c.params,els}));
+    cabs.push(genCabNorm({id:c.id||Date.now()+cabs.length,name:c.name||'Szafka',code:c.code||'',img:c.img||'',base:c.base,params:c.params,els}));
   }
   genCabinets=cabs;
-  if(cfg.opts&&(cfg.opts.base===10||cfg.opts.base===16))genOpts=cfg.opts;
+  if(Array.isArray(cfg.projects)){
+    genProjects=cfg.projects.map(genProjNorm);
+    // uchwyty szablonów w formatkach odtwarzamy z katalogu szablony/
+    for(const p of genProjects)for(const r of (p.rows||[])){
+      r.tpl=null;
+      if(r.tplName){const h=await resolveTpl(r.tplName);if(h)r.tpl=h;}
+    }
+    genProjSel=Math.min(genProjSel,Math.max(0,genProjects.length-1));
+    genBindRows();
+    genRenderRows();
+  }
+  if(cfg.opts&&(cfg.opts.base===10||cfg.opts.base===16))genOpts=Object.assign({pin:'0000'},cfg.opts);
   // Ustawienia narzędzi (frezy, piłki, skaner) – całość ustawień
   if(cfg.toolSettings&&Array.isArray(cfg.toolSettings.millTools)){
     toolSettings={
@@ -3752,9 +4016,11 @@ async function genApplyCfg(cfg,resolveTpl){
   }
   genCabSel=0;
   genRenderCabSel();
+  genRenderProjSel();
   try{
     await IDB.set('genCabinets',genCabinets);
     await IDB.set('genOpts',genOpts);
+    await IDB.set('genProjects',genProjects);
     await IDB.set('toolSettings',toolSettings);
   }catch(e){console.warn(e);}
   return {count:cabs.length,missing};
@@ -3774,6 +4040,11 @@ async function genImportCfg(silent){
     try{fh=await genCfgDir.getFileHandle(GEN_CFG_FILE);}
     catch(_){fh=await genCfgDir.getFileHandle(GEN_CFG_FILE_OLD);}
     const cfg=JSON.parse(await (await fh.getFile()).text());
+    // Cichy start: nie nadpisuj świeższego stanu (IDB) starszym plikiem –
+    // plik jest teraz zapisywany rzadziej (przy ukryciu karty), więc może
+    // być starszy niż to, co siedzi w przeglądarce
+    if(silent&&!(await genCfgFileNewer(cfg)))
+      {genCfgStatus(genCfgDir.name+' ✓');return true;}
     let tplDir=null;
     try{tplDir=await genCfgDir.getDirectoryHandle(GEN_CFG_TPLDIR);}catch(e){}
     const res=await genApplyCfg(cfg,async name=>{
@@ -3800,6 +4071,14 @@ async function genImportCfg(silent){
    z szablony/<nazwa> dopiero przy generowaniu plików. Zapis automatyczny
    wymaga jednak wskazania katalogu (ograniczenie przeglądarki). */
 let genCfgViaFetch=false;
+/* true = plik ustawień jest nowszy niż ostatni eksport z tej przeglądarki
+   (czyli przyszedł z zewnątrz, np. gitem – wtedy go wczytujemy) */
+async function genCfgFileNewer(cfg){
+  const last=await IDB.get('genCfgExportedAt').catch(()=>null);
+  if(!last)return true;              // nic nie eksportowaliśmy – plik rządzi
+  if(!cfg||!cfg.exported)return true;
+  return String(cfg.exported)>String(last);
+}
 async function genImportCfgFetch(){
   if(location.protocol==='file:')return false; // fetch względny nie działa z file://
   try{
@@ -3807,6 +4086,7 @@ async function genImportCfgFetch(){
     if(!r.ok)r=await fetch(GEN_CFG_FILE_OLD,{cache:'no-store'});
     if(!r.ok)return false;
     const cfg=JSON.parse(await r.text());
+    if(!(await genCfgFileNewer(cfg))){genCfgStatus('katalog aplikacji (auto-odczyt)');genCfgViaFetch=true;return true;}
     await genApplyCfg(cfg,async()=>null); // szablony przez fetch przy zapisie
     genCfgViaFetch=true;
     genCfgStatus('katalog aplikacji (auto-odczyt)');
@@ -3838,17 +4118,27 @@ function genToggleOpts(){
 /* ── Tryb generatora: Generuj szafki / Edytuj szafki ────────────── */
 let genMode='run'; // 'run' = generowanie, 'edit' = edycja definicji
 function genSetMode(m){
-  genMode=(m==='edit')?'edit':'run';
+  m=(m==='edit')?'edit':'run';
+  // Konstruktor szafek chroniony PIN-em (genOpts.pin, w ustawienia.json; domyślnie 0000)
+  if(m==='edit'&&!genPinOk){
+    const pin=prompt('Konstruktor szafek – podaj PIN:');
+    if(pin===null)return;
+    if(String(pin).trim()!==String(genOpts.pin??'0000')){showToast('Nieprawidłowy PIN',true);return;}
+    genPinOk=true;
+  }
+  genMode=m;
   document.getElementById('gen-mode-run').classList.toggle('act',genMode==='run');
   document.getElementById('gen-mode-edit').classList.toggle('act',genMode==='edit');
-  // Generuj: wybór szafki + wymiary + formatki. Edytuj: przyciski szafek + definicja.
+  // Generuj: projekt (lista szafek) + formatki. Edytuj: wybór szafki + definicja.
   document.getElementById('gen-edit-btns').style.display=genMode==='edit'?'inline-flex':'none';
-  document.getElementById('gen-dims-box').style.display=genMode==='run'?'':'none';
+  document.getElementById('gen-cab-box').style.display=genMode==='edit'?'':'none';
+  document.getElementById('gen-proj-box').style.display=genMode==='run'?'':'none';
   document.getElementById('gen-list-box').style.display=(genMode==='run'&&genRows.length)?'':'none';
   if(genMode==='run'){
     // schowaj panel edycji i zresetuj przycisk
     document.getElementById('gen-opts-box').style.display='none';
     document.getElementById('gen-opts-toggle').textContent='✎ Edytuj szafkę';
+    genRenderProjSel();
   }
   IDB.set('genMode',genMode).catch(()=>{});
 }
@@ -3863,9 +4153,69 @@ function genRenderCabSel(){
   if(title)title.textContent='⚙ Ustawienia szafki: '+(genCab()?.name||'');
   const baseSel=document.getElementById('gen-base');
   if(baseSel)baseSel.value=String(genOpts.base===10?10:16);
+  genRenderCabImg();
   genRenderDefs();
   genRenderParams();
   genRenderParamsDef();
+}
+/* ── Grafika poglądowa szafki ───────────────────────────────────── */
+function genRenderCabImg(){
+  const img=document.getElementById('gen-cab-img');
+  const del=document.getElementById('gen-img-del');
+  const c=genCab();
+  if(!img||!del)return;
+  if(c?.img){img.src=c.img;img.style.display='';del.style.display='';}
+  else{img.src='';img.style.display='none';del.style.display='none';}
+}
+/* Skaluje obraz do miniatury (maks. 320 px) → dataURL; trzymany w definicji
+   szafki i w ustawienia.json, więc musi zostać mały */
+function genScaleImg(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);
+    const im=new Image();
+    im.onload=()=>{
+      URL.revokeObjectURL(url);
+      const MAX=320;
+      const sc=Math.min(1,MAX/Math.max(im.width,im.height));
+      const cv=document.createElement('canvas');
+      cv.width=Math.max(1,Math.round(im.width*sc));
+      cv.height=Math.max(1,Math.round(im.height*sc));
+      cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+      res(cv.toDataURL('image/jpeg',0.85));
+    };
+    im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Nie można odczytać obrazu'));};
+    im.src=url;
+  });
+}
+async function genPickImg(){
+  const c=genCab();if(!c)return;
+  try{
+    let file=null;
+    if('showOpenFilePicker' in window){
+      const [h]=await window.showOpenFilePicker({types:[{description:'Obrazy',accept:{'image/*':['.png','.jpg','.jpeg','.webp','.gif','.bmp']}}]});
+      file=await h.getFile();
+    }else{
+      file=await new Promise(res=>{
+        const inp=document.createElement('input');
+        inp.type='file';inp.accept='image/*';
+        inp.onchange=()=>res(inp.files?.[0]||null);
+        inp.click();
+      });
+    }
+    if(!file)return;
+    c.img=await genScaleImg(file);
+    genRenderCabImg();
+    genRenderProjCabs();
+    genPersist();
+    showToast('✓ Dodano grafikę szafki');
+  }catch(e){if(e.name!=='AbortError'){console.error(e);showToast('Błąd wczytania grafiki: '+e.message,true);}}
+}
+function genDelImg(){
+  const c=genCab();if(!c)return;
+  c.img='';
+  genRenderCabImg();
+  genRenderProjCabs();
+  genPersist();
 }
 function genSelCab(i){genCabSel=Math.max(0,Math.min(genCabinets.length-1,i));genRenderCabSel();}
 function genAddCab(){
@@ -3884,7 +4234,9 @@ function genAddCab(){
 }
 function genDelCab(){
   if(genCabinets.length<=1){showToast('Musi zostać przynajmniej jedna szafka',true);return;}
-  if(!confirm(`Usunąć szafkę „${genCab()?.name}” wraz z jej elementami i szablonami?`))return;
+  const cid=genCab()?.id;
+  const used=genProjects.reduce((n,p)=>n+(p.cabs||[]).filter(pc=>pc.cabId===cid).length,0);
+  if(!confirm(`Usunąć szafkę „${genCab()?.name}” wraz z jej elementami i szablonami?`+(used?`\nUwaga: używana w projektach (${used}×) – wpisy przełączą się na pierwszą szafkę.`:'')))return;
   genCabinets.splice(genCabSel,1);
   genCabSel=0;
   genRenderCabSel();
@@ -4004,6 +4356,7 @@ async function genDefPickTpl(i){
     c.els[i]=genElNorm(c.els[i]);
     c.els[i].tpl=h;
     c.els[i].tplName=h.name;
+    genTplCopyPending=true; // nowy szablon → skopiuj do szablony/ przy eksporcie
     genRvarOpen.add(i); // po wyborze pliku od razu pokaż jego zmienne r
     genRenderDefs();
     genPersist();
@@ -4061,8 +4414,15 @@ function genMakeTCN(tplTxt,r){
 
 async function genWriteFiles(){
   if(!genRows.length){showToast('Najpierw wygeneruj listę elementów',true);return;}
-  const todo=genRows.filter(r=>!r.fileName);
-  if(!todo.length){showToast('Wszystkie elementy mają już pliki',true);return;}
+  // Element bez szablonu TCN = bez pliku i bez kodu kreskowego.
+  // Wiersz z plikiem i zmienionymi wymiarami (dirty) = nadpisanie TEGO SAMEGO
+  // pliku nową zawartością – kod/nazwa nie zmienia się.
+  const noTpl=genRows.filter(r=>!r.tpl&&!r.tplName).length;
+  const todo=genRows.filter(r=>(r.tpl||r.tplName)&&(!r.fileName||r.dirty));
+  if(!todo.length){
+    showToast(noTpl?'Brak elementów z szablonem TCN do wygenerowania':'Wszystkie elementy mają już aktualne pliki',true);
+    return;
+  }
   // Pliki lądują w katalogu z paska plików po lewej
   if(!brDirHandle){showToast('Najpierw wybierz katalog na pasku plików po lewej (📁 Katalog)',true);return;}
   const outDir=brDirHandle;
@@ -4076,37 +4436,52 @@ async function genWriteFiles(){
   }catch(e){showToast('Brak dostępu do katalogu: '+e.message,true);return;}
   const tplCache=new Map();
   const tplFail=new Set();
-  // Unikalne nazwy: kolejne liczby (system 10/16, maks 10 cyfr) od max numeru w katalogu
+  // Unikalne nazwy: kolejne liczby (system 10/16) dopełniane zerami do stałej
+  // długości GEN_CODE_MAX; numeracja zaczyna się od 0 (pierwszy plik = same zera)
   const base=genOpts.base===10?10:16;
   const reCode=base===16?/^([0-9A-F]{1,10})\.tcn$/i:/^(\d{1,10})\.tcn$/i;
-  let maxN=0;
+  let maxN=-1; // -1 = katalog bez plików → pierwszy kod 000…0
   try{
     for await(const [name,fh] of outDir.entries()){
       const m=name.match(reCode);
       if(fh.kind==='file'&&m)maxN=Math.max(maxN,parseInt(m[1],base));
     }
   }catch(e){}
-  let n=maxN,written=0;
+  let n=maxN+1,written=0,updated=0;
   for(const r of todo){
-    n++;
-    const code=n.toString(base).toUpperCase();
-    if(code.length>GEN_CODE_MAX){showToast('Przekroczono maks. '+GEN_CODE_MAX+' cyfr kodu',true);break;}
+    let fname=r.fileName;
+    if(!fname){
+      const code=n.toString(base).toUpperCase().padStart(GEN_CODE_MAX,'0');
+      if(code.length>GEN_CODE_MAX){showToast('Przekroczono maks. '+GEN_CODE_MAX+' cyfr kodu',true);break;}
+      n++;
+      fname=code+'.TCN'; // plik bez '%'; '%' tylko w kodzie kreskowym
+    }
     let tpl=await genGetTplText(r.tpl,tplCache);
     // Ustawienia z katalogu aplikacji (fetch): szablon czytamy z szablony/<nazwa>
     if(tpl.txt===null&&!r.tpl&&r.tplName&&genCfgViaFetch)tpl=await genFetchTplText(r.tplName,tplCache);
     if((r.tpl||r.tplName)&&tpl.txt===null)tplFail.add(r.tpl?.name||r.tplName||'?');
     const txt=genMakeTCN(tpl.txt,r);
     try{
-      const fh=await outDir.getFileHandle(code+'.TCN',{create:true});
+      const fh=await outDir.getFileHandle(fname,{create:true});
       const w=await fh.createWritable();
       await w.write(encodeTcnText(txt,tpl.enc));await w.close();
-      r.fileName=code+'.TCN'; // plik bez '%'; '%' tylko w kodzie kreskowym
-      written++;
-    }catch(e){showToast('Błąd zapisu '+code+'.TCN: '+e.message,true);break;}
+      if(r.fileName){updated++;brInvalidateThumb(fname);}else{written++;}
+      r.fileName=fname;
+      r.dirty=false;
+    }catch(e){showToast('Błąd zapisu '+fname+': '+e.message,true);break;}
   }
   genRenderRows();
+  // natychmiast do IDB – nawet gdyby watcher serwera przeładował stronę
+  // po zapisie plików, kody formatek nie mogą zginąć
+  genCfgExportPending=true;
+  await genPersistNow();
   if(tplFail.size)showToast('Nie odczytano szablonów (użyto pustych): '+[...tplFail].join(', '),true);
-  if(written)showToast(`✓ Zapisano ${written} plików w „${outDir.name}”`);
+  if(written||updated){
+    const parts=[];
+    if(written)parts.push(`zapisano ${written} nowych`);
+    if(updated)parts.push(`nadpisano ${updated} zmienionych`);
+    showToast(`✓ Pliki: ${parts.join(', ')} w „${outDir.name}”`+(noTpl?` · pominięto ${noTpl} bez szablonu`:''));
+  }
   brLoadDir(); // nowe pliki od razu widoczne na pasku
 }
 
@@ -4136,7 +4511,7 @@ async function genInitFromIDB(){
     const cd=await IDB.get('genCfgDir').catch(()=>null);
     if(cd){genCfgDir=cd;genCfgStatus(cd.name);}
     const o=await IDB.get('genOpts').catch(()=>null);
-    if(o&&(o.base===10||o.base===16))genOpts=o;
+    if(o&&(o.base===10||o.base===16))genOpts=Object.assign({pin:'0000'},o);
     const cabs=await IDB.get('genCabinets').catch(()=>null);
     if(Array.isArray(cabs)&&cabs.length){
       genCabinets=cabs;
@@ -4149,13 +4524,20 @@ async function genInitFromIDB(){
         if(h)genCabinets[0].els.forEach(el=>{if(mig[k].includes(el.name))el.tpl=h;});
       }
     }
+    const projs=await IDB.get('genProjects').catch(()=>null);
+    if(Array.isArray(projs))genProjects=projs.map(genProjNorm);
+    const ps=await IDB.get('genProjSel').catch(()=>null);
+    if(Number.isInteger(ps))genProjSel=ps;
   }catch(e){console.warn('genInitFromIDB:',e);}
   if(!genCabinets.length)genCabinets=[genDefaultCabinet()];
+  genProjSel=Math.min(Math.max(0,genProjSel),Math.max(0,genProjects.length-1));
   genCabSel=0;
+  genBindRows(); // ostatnio otwarty projekt wraca z szafkami i formatkami
   genRenderCabSel();
-  // Przywróć tryb Generuj/Edytuj
-  const gm=await IDB.get('genMode').catch(()=>null);
-  genSetMode(gm==='edit'?'edit':'run');
+  genRenderProjSel();
+  genRenderRows();
+  // Start zawsze w trybie Generuj – Konstruktor wymaga PIN-u
+  genSetMode('run');
   // Katalog ustawień jest źródłem prawdy – przy starcie wczytaj z niego (po cichu),
   // np. świeże zmiany przyniesione gitem z innego komputera.
   // Podstawowy katalog = katalog pliku HTML (fetch względny), wskazany ręcznie ma pierwszeństwo.
